@@ -1,0 +1,8 @@
+BUS-Tracking/
+
+__pycache__/
+*.py[cod]
+
+.env
+
+.vscode/
