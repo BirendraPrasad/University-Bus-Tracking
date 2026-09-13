@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from backend.app.database.connection import get_connection
+from backend.app.routers.user import router as user_router
+from backend.app.routers.auth import router as auth_router
 
 app = FastAPI(title="University Bus Tracking API")
 
@@ -26,3 +28,7 @@ def database_test():
             "message": "Database connection failed!",
             "error": str(e)
         }
+
+
+app.include_router(user_router)
+app.include_router(auth_router)
