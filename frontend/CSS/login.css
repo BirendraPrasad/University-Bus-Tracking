@@ -1,0 +1,1193 @@
+/* =========================================================
+   CHANAKYA UNIVERSITY
+   REAL-TIME UNIVERSITY BUS TRACKING
+   LOGIN PAGE — PROFESSIONAL UI
+   ========================================================= */
+
+:root {
+    --navy: #061a38;
+    --navy-2: #092d60;
+    --navy-3: #1058a8;
+
+    --blue: #246bdd;
+    --blue-dark: #1557bd;
+    --blue-soft: #edf4ff;
+
+    --gold: #f5b83d;
+    --gold-light: #ffc95c;
+
+    --white: #ffffff;
+    --text: #10233f;
+    --text-light: #65758b;
+    --muted: #8b99aa;
+
+    --border: #dce4ef;
+}
+
+/* =========================================================
+   RESET
+   ========================================================= */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html {
+    width: 100%;
+    min-height: 100%;
+}
+
+body {
+    width: 100%;
+    min-height: 100vh;
+
+    font-family: "Inter", Arial, sans-serif;
+
+    background: var(--navy);
+    color: var(--text);
+
+    overflow-x: hidden;
+}
+
+button,
+input {
+    font-family: inherit;
+}
+
+button {
+    cursor: pointer;
+}
+
+
+/* =========================================================
+   MAIN SHELL
+   ========================================================= */
+
+.login-shell {
+    position: relative;
+
+    width: 100%;
+    min-height: 100vh;
+
+    overflow: hidden;
+}
+
+
+/* =========================================================
+   FULL BLUE BACKGROUND
+   ========================================================= */
+
+.brand-panel {
+    position: absolute;
+
+    inset: 0;
+
+    width: 100%;
+    min-height: 100vh;
+
+    padding: 34px 50px;
+
+    display: flex;
+    flex-direction: column;
+
+    color: #fff;
+
+    overflow: hidden;
+
+    background:
+        radial-gradient(
+            circle at 90% 85%,
+            rgba(48, 125, 229, 0.28),
+            transparent 30%
+        ),
+        radial-gradient(
+            circle at 10% 15%,
+            rgba(50, 117, 221, 0.22),
+            transparent 30%
+        ),
+        linear-gradient(
+            135deg,
+            #061a38 0%,
+            #092d60 50%,
+            #1058a8 100%
+        );
+}
+
+
+/* =========================================================
+   BACKGROUND DOTS
+   ========================================================= */
+
+.brand-decor {
+    position: absolute;
+
+    inset: 0;
+
+    pointer-events: none;
+
+    background-image:
+        radial-gradient(
+            rgba(255,255,255,0.10) 1px,
+            transparent 1px
+        );
+
+    background-size: 25px 25px;
+
+    opacity: .28;
+}
+
+
+/* =========================================================
+   DECORATIVE CIRCLES
+   ========================================================= */
+
+.brand-panel::before {
+    content: "";
+
+    position: absolute;
+
+    width: 700px;
+    height: 700px;
+
+    right: -350px;
+    bottom: -330px;
+
+    border-radius: 50%;
+
+    border: 90px solid rgba(255,255,255,.035);
+
+    pointer-events: none;
+}
+
+.brand-panel::after {
+    content: "";
+
+    position: absolute;
+
+    width: 500px;
+    height: 500px;
+
+    right: -250px;
+    bottom: -220px;
+
+    border-radius: 50%;
+
+    border: 1px solid rgba(255,255,255,.07);
+
+    pointer-events: none;
+}
+
+
+/* =========================================================
+   UNIVERSITY LOGO
+   ========================================================= */
+
+.brand-header {
+    position: relative;
+
+    z-index: 5;
+
+    display: flex;
+    align-items: center;
+}
+
+.brand-logo {
+    width: 250px;
+    height: 65px;
+
+    display: block;
+
+    object-fit: contain;
+    object-position: left center;
+
+    /*
+       Original logo has dark blue text.
+       Convert it to white so it is clearly
+       visible on the blue background.
+    */
+    filter:
+        brightness(0)
+        invert(1);
+
+    opacity: 1;
+}
+
+
+/* =========================================================
+   LEFT BRAND CONTENT
+   ========================================================= */
+
+.brand-body {
+    position: relative;
+
+    z-index: 5;
+
+    width: 48%;
+    max-width: 610px;
+
+    margin: auto 0;
+}
+
+
+/* =========================================================
+   TAGLINE
+   ========================================================= */
+
+.brand-tagline {
+    margin-bottom: 18px;
+
+    color: rgba(255,255,255,.78);
+
+    font-size: 11px;
+    font-weight: 800;
+
+    letter-spacing: 1.8px;
+
+    text-transform: uppercase;
+}
+
+.brand-tagline .dot {
+    margin: 0 8px;
+
+    color: var(--gold);
+}
+
+
+/* =========================================================
+   TITLE
+   ========================================================= */
+
+.brand-title {
+    margin-bottom: 19px;
+
+    font-family: "Archivo", sans-serif;
+
+    font-size: clamp(42px, 5vw, 68px);
+
+    line-height: 1.02;
+
+    letter-spacing: -2.5px;
+
+    color: #fff;
+}
+
+.brand-title .accent {
+    color: var(--gold-light);
+}
+
+
+/* =========================================================
+   DESCRIPTION
+   ========================================================= */
+
+.brand-desc {
+    max-width: 570px;
+
+    margin-bottom: 30px;
+
+    color: rgba(255,255,255,.72);
+
+    font-size: 14px;
+
+    line-height: 1.75;
+}
+
+
+/* =========================================================
+   SERVICE CARDS
+   ========================================================= */
+
+.service-grid {
+    display: flex;
+
+    gap: 12px;
+
+    max-width: 450px;
+}
+
+.service-card {
+    min-width: 185px;
+
+    padding: 13px 15px;
+
+    display: flex;
+    align-items: center;
+
+    gap: 12px;
+
+    border: 1px solid rgba(255,255,255,.14);
+
+    border-radius: 12px;
+
+    background: rgba(255,255,255,.07);
+
+    backdrop-filter: blur(10px);
+
+    transition: .2s;
+}
+
+.service-card:hover {
+    transform: translateY(-2px);
+
+    background: rgba(255,255,255,.10);
+
+    border-color: rgba(255,255,255,.20);
+}
+
+.service-icon {
+    width: 39px;
+    height: 39px;
+
+    flex-shrink: 0;
+
+    display: grid;
+    place-items: center;
+
+    border-radius: 10px;
+
+    background:
+        linear-gradient(
+            145deg,
+            #2d76e4,
+            #1557bd
+        );
+
+    color: #fff;
+
+    font-size: 18px;
+
+    box-shadow:
+        0 7px 15px rgba(0,0,0,.15);
+}
+
+.service-text h3 {
+    margin-bottom: 3px;
+
+    color: #fff;
+
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.service-text p {
+    color: rgba(255,255,255,.55);
+
+    font-size: 9px;
+}
+
+
+/* =========================================================
+   FOOTER
+   ========================================================= */
+
+.brand-footer {
+    position: relative;
+
+    z-index: 5;
+
+    color: rgba(255,255,255,.48);
+
+    font-size: 10px;
+}
+
+
+/* =========================================================
+   RIGHT FORM PANEL
+   ========================================================= */
+
+.form-panel {
+    position: absolute;
+
+    top: 0;
+    right: 0;
+
+    width: 46%;
+    height: 100vh;
+
+    z-index: 20;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    padding: 30px 50px;
+
+    background: transparent;
+
+    overflow-y: auto;
+
+    pointer-events: none;
+}
+
+
+/* =========================================================
+   FORM INNER
+   ========================================================= */
+
+.form-inner {
+    width: 100%;
+
+    max-width: 455px;
+
+    pointer-events: auto;
+}
+
+
+/* =========================================================
+   BACK TO HOME
+   ========================================================= */
+
+.back-link {
+    display: inline-flex;
+
+    align-items: center;
+
+    gap: 6px;
+
+    margin-bottom: 12px;
+
+    padding: 7px 11px;
+
+    border-radius: 20px;
+
+    color: rgba(255,255,255,.90);
+
+    background: rgba(255,255,255,.08);
+
+    border: 1px solid rgba(255,255,255,.08);
+
+    backdrop-filter: blur(10px);
+
+    text-decoration: none;
+
+    font-size: 11px;
+    font-weight: 700;
+
+    transition: .2s;
+}
+
+.back-link:hover {
+    background: rgba(255,255,255,.15);
+
+    transform: translateX(-2px);
+}
+
+
+/* =========================================================
+   LOGIN CARD
+   ========================================================= */
+
+.login-card {
+    width: 100%;
+
+    padding: 30px 34px 25px;
+
+    border-radius: 21px;
+
+    background:
+        linear-gradient(
+            180deg,
+            rgba(255,255,255,.99),
+            rgba(249,251,255,.98)
+        );
+
+    border: 1px solid rgba(255,255,255,.75);
+
+    box-shadow:
+        0 30px 70px rgba(0,0,0,.28),
+        0 10px 25px rgba(0,0,0,.10);
+
+    backdrop-filter: blur(20px);
+}
+
+
+/* =========================================================
+   LOGIN ICON
+   ========================================================= */
+
+.card-icon {
+    width: 52px;
+    height: 52px;
+
+    margin-bottom: 15px;
+
+    display: grid;
+    place-items: center;
+
+    border-radius: 15px;
+
+    background:
+        linear-gradient(
+            145deg,
+            #2e73df,
+            #1557bd
+        );
+
+    color: #fff;
+
+    font-size: 22px;
+
+    box-shadow:
+        0 10px 23px rgba(23,105,209,.24);
+}
+
+
+/* =========================================================
+   CARD TEXT
+   ========================================================= */
+
+.card-title {
+    margin-bottom: 4px;
+
+    color: #0b1d38;
+
+    font-family: "Archivo", sans-serif;
+
+    font-size: 27px;
+
+    line-height: 1.2;
+}
+
+.card-sub {
+    margin-bottom: 4px;
+
+    color: #334963;
+
+    font-size: 13px;
+
+    font-weight: 600;
+}
+
+.card-help {
+    margin-bottom: 21px;
+
+    color: #718096;
+
+    font-size: 11px;
+
+    line-height: 1.5;
+}
+
+
+/* =========================================================
+   FORM FIELD
+   ========================================================= */
+
+.field {
+    margin-bottom: 15px;
+}
+
+.field label {
+    display: block;
+
+    margin-bottom: 7px;
+
+    color: #30445d;
+
+    font-size: 11px;
+
+    font-weight: 800;
+}
+
+
+/* =========================================================
+   INPUT WRAPPER
+   ========================================================= */
+
+.input-wrap {
+    position: relative;
+
+    width: 100%;
+
+    min-height: 48px;
+
+    display: flex;
+
+    align-items: center;
+
+    border: 1px solid var(--border);
+
+    border-radius: 10px;
+
+    background: #fff;
+
+    transition:
+        border .2s ease,
+        box-shadow .2s ease;
+}
+
+.input-wrap:hover {
+    border-color: #bccbe0;
+}
+
+.input-wrap:focus-within {
+    border-color: var(--blue);
+
+    box-shadow:
+        0 0 0 4px rgba(36,107,221,.10);
+}
+
+
+/* =========================================================
+   INPUT ICON
+   ========================================================= */
+
+.input-icon {
+    position: absolute;
+
+    left: 14px;
+
+    display: grid;
+
+    place-items: center;
+
+    color: #71839a;
+
+    pointer-events: none;
+
+    font-size: 14px;
+}
+
+
+/* =========================================================
+   INPUT
+   ========================================================= */
+
+.input-wrap input {
+    width: 100%;
+
+    height: 46px;
+
+    padding:
+        12px
+        48px
+        12px
+        42px;
+
+    border: 0;
+
+    outline: none;
+
+    background: transparent;
+
+    color: #10233f;
+
+    font-size: 12px;
+}
+
+.input-wrap input::placeholder {
+    color: #9aa8ba;
+}
+
+
+/* =========================================================
+   PASSWORD TOGGLE
+   ========================================================= */
+
+.toggle-password {
+    position: absolute;
+
+    right: 7px;
+
+    padding: 7px 9px;
+
+    border: 0;
+
+    border-radius: 7px;
+
+    background: transparent;
+
+    color: var(--blue);
+
+    font-size: 10px;
+
+    font-weight: 800;
+
+    cursor: pointer;
+
+    transition: .2s;
+}
+
+.toggle-password:hover {
+    background: var(--blue-soft);
+}
+
+
+/* =========================================================
+   REMEMBER ME / FORGOT
+   ========================================================= */
+
+.row-between {
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    gap: 10px;
+
+    margin: 5px 0 18px;
+}
+
+.checkbox {
+    display: flex;
+
+    align-items: center;
+
+    gap: 7px;
+
+    color: #637389;
+
+    font-size: 10px;
+
+    cursor: pointer;
+}
+
+.checkbox input {
+    width: 15px;
+    height: 15px;
+
+    accent-color: var(--blue);
+
+    cursor: pointer;
+}
+
+.link-btn {
+    padding: 0;
+
+    border: 0;
+
+    background: transparent;
+
+    color: var(--blue);
+
+    font-size: 10px;
+
+    font-weight: 800;
+
+    cursor: pointer;
+}
+
+.link-btn:hover {
+    text-decoration: underline;
+}
+
+
+/* =========================================================
+   LOGIN BUTTON
+   ========================================================= */
+
+.submit-btn {
+    width: 100%;
+
+    min-height: 48px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    gap: 9px;
+
+    border: 0;
+
+    border-radius: 10px;
+
+    background:
+        linear-gradient(
+            135deg,
+            #2e73df,
+            #1557bd
+        );
+
+    color: #fff;
+
+    font-size: 12px;
+
+    font-weight: 800;
+
+    box-shadow:
+        0 12px 25px rgba(23,105,209,.24);
+
+    transition:
+        transform .2s ease,
+        box-shadow .2s ease,
+        opacity .2s ease;
+}
+
+.submit-btn:hover {
+    transform: translateY(-1px);
+
+    box-shadow:
+        0 16px 30px rgba(23,105,209,.30);
+}
+
+.submit-btn:active {
+    transform: translateY(0);
+}
+
+.submit-btn:disabled {
+    opacity: .65;
+
+    cursor: wait;
+
+    transform: none;
+}
+
+
+/* =========================================================
+   FORM MESSAGE
+   ========================================================= */
+
+.form-message {
+    min-height: 18px;
+
+    margin-top: 8px;
+
+    color: #d64b4b;
+
+    font-size: 10px;
+
+    font-weight: 600;
+
+    line-height: 1.4;
+
+    text-align: center;
+}
+
+
+/* =========================================================
+   REGISTER LINK
+   ========================================================= */
+
+.register-link {
+    margin-top: 17px;
+
+    color: #7b899a;
+
+    font-size: 10px;
+
+    text-align: center;
+}
+
+.register-link a {
+    margin-left: 4px;
+
+    color: var(--blue);
+
+    font-weight: 800;
+
+    text-decoration: none;
+}
+
+.register-link a:hover {
+    text-decoration: underline;
+}
+
+
+/* =========================================================
+   TABLET
+   ========================================================= */
+
+@media (max-width: 1050px) {
+
+    .brand-panel {
+        padding-left: 35px;
+        padding-right: 35px;
+    }
+
+    .form-panel {
+        width: 48%;
+
+        padding-left: 25px;
+        padding-right: 25px;
+    }
+
+    .brand-body {
+        width: 50%;
+    }
+
+    .brand-title {
+        font-size: 48px;
+    }
+
+    .brand-desc {
+        font-size: 12px;
+    }
+
+    .service-card {
+        min-width: 165px;
+    }
+
+    .brand-logo {
+        width: 220px;
+    }
+}
+
+
+/* =========================================================
+   MOBILE
+   ========================================================= */
+
+@media (max-width: 760px) {
+
+    body {
+        overflow-y: auto;
+    }
+
+    .login-shell {
+        min-height: 100vh;
+    }
+
+    .brand-panel {
+        position: relative;
+
+        min-height: 100vh;
+
+        padding: 25px 20px 30px;
+
+        display: flex;
+
+        flex-direction: column;
+
+        justify-content: flex-start;
+    }
+
+    .brand-logo {
+        width: 190px;
+        height: auto;
+    }
+
+    .brand-body {
+        width: 100%;
+
+        max-width: 500px;
+
+        margin: 80px auto 0;
+    }
+
+    .brand-tagline {
+        font-size: 9px;
+
+        letter-spacing: 1.3px;
+    }
+
+    .brand-title {
+        font-size: 39px;
+
+        letter-spacing: -1.2px;
+    }
+
+    .brand-desc {
+        font-size: 11px;
+
+        line-height: 1.65;
+    }
+
+    .service-grid {
+        display: none;
+    }
+
+    .brand-footer {
+        margin-top: auto;
+
+        font-size: 9px;
+    }
+
+    .form-panel {
+        position: absolute;
+
+        top: 125px;
+        right: 0;
+
+        width: 100%;
+
+        height: auto;
+
+        min-height: calc(100vh - 125px);
+
+        padding:
+            20px
+            16px
+            40px;
+
+        align-items: flex-start;
+
+        justify-content: center;
+    }
+
+    .form-inner {
+        width: 100%;
+
+        max-width: 430px;
+    }
+
+    .back-link {
+        margin-bottom: 10px;
+    }
+
+    .login-card {
+        padding: 27px 22px 23px;
+
+        border-radius: 18px;
+    }
+
+    .card-title {
+        font-size: 24px;
+    }
+
+    .card-sub {
+        font-size: 12px;
+    }
+
+    .card-help {
+        font-size: 10px;
+    }
+}
+
+
+/* =========================================================
+   SMALL MOBILE
+   ========================================================= */
+
+@media (max-width: 430px) {
+
+    .brand-panel {
+        padding:
+            20px
+            16px
+            25px;
+    }
+
+    .brand-logo {
+        width: 175px;
+        height: auto;
+    }
+
+    .brand-body {
+        margin-top: 75px;
+    }
+
+    .brand-title {
+        font-size: 34px;
+
+        line-height: 1.05;
+    }
+
+    .brand-desc {
+        max-width: 100%;
+
+        font-size: 10px;
+    }
+
+    .form-panel {
+        top: 110px;
+
+        min-height: calc(100vh - 110px);
+
+        padding:
+            16px
+            12px
+            30px;
+    }
+
+    .login-card {
+        padding:
+            24px
+            18px
+            21px;
+
+        border-radius: 17px;
+    }
+
+    .card-icon {
+        width: 47px;
+        height: 47px;
+
+        margin-bottom: 13px;
+    }
+
+    .card-title {
+        font-size: 22px;
+    }
+
+    .field label {
+        font-size: 10px;
+    }
+
+    .input-wrap input {
+        font-size: 11px;
+    }
+
+    .row-between {
+        flex-wrap: wrap;
+    }
+}
+
+
+/* =========================================================
+   SHORT DESKTOP SCREEN
+   ========================================================= */
+
+@media (min-width: 761px) and (max-height: 720px) {
+
+    .brand-panel {
+        padding-top: 22px;
+        padding-bottom: 22px;
+    }
+
+    .brand-logo {
+        width: 220px;
+        height: 58px;
+    }
+
+    .brand-title {
+        font-size: 43px;
+    }
+
+    .brand-desc {
+        margin-bottom: 18px;
+    }
+
+    .login-card {
+        padding:
+            23px
+            30px
+            19px;
+    }
+
+    .card-icon {
+        width: 44px;
+        height: 44px;
+
+        margin-bottom: 10px;
+    }
+
+    .card-title {
+        font-size: 23px;
+    }
+
+    .card-help {
+        margin-bottom: 14px;
+    }
+
+    .field {
+        margin-bottom: 10px;
+    }
+
+    .input-wrap {
+        min-height: 43px;
+    }
+
+    .input-wrap input {
+        height: 41px;
+    }
+
+    .submit-btn {
+        min-height: 44px;
+    }
+}

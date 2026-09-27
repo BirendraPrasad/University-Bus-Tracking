@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-<link rel="stylesheet" href="../CSS/landing.css">
+  <link rel="stylesheet" href="../CSS/landing.css">
 </head>
 
 <body>
@@ -19,29 +19,27 @@
   <header class="navbar" id="navbar">
     <div class="navbar__inner container">
       <a href="landing page.html" class="navbar__brand">
-        <span class="navbar__mark" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect x="2" y="5" width="20" height="12" rx="2.2" fill="currentColor"/>
-            <rect x="4.5" y="7.2" width="4.2" height="4" rx="0.6" fill="var(--paper)"/>
-            <rect x="9.7" y="7.2" width="4.2" height="4" rx="0.6" fill="var(--paper)"/>
-            <rect x="14.9" y="7.2" width="4.2" height="4" rx="0.6" fill="var(--paper)"/>
-            <circle cx="7" cy="19" r="1.9" fill="currentColor"/>
-            <circle cx="17" cy="19" r="1.9" fill="currentColor"/>
-          </svg>
+
+        <span class="navbar__university">
+          <img
+            src="../photo/chanakya-university.svg"
+            alt="Chanakya University"
+          >
         </span>
-        <span class="navbar__name">CampusTransit<span class="navbar__name-accent">Live</span></span>
+
       </a>
 
       <nav class="navbar__links" id="navLinks" aria-label="Primary">
-        <a href="#home" class="navbar__link is-active">Home</a>
-        <a href="#features" class="navbar__link">Features</a>
+        <a href="#home"         class="navbar__link is-active">Home</a>
+        <a href="#features"     class="navbar__link">Features</a>
         <a href="#how-it-works" class="navbar__link">How It Works</a>
-        <a href="#about" class="navbar__link">About</a>
+        <a href="#about"        class="navbar__link">About</a>
       </nav>
 
       <div class="navbar__actions">
         <a href="login.html" class="btn btn--primary btn--sm" id="navLoginBtn">Login</a>
-        <button class="navbar__toggle" id="navToggle" aria-expanded="false" aria-controls="navLinks" aria-label="Open menu">
+        <button class="navbar__toggle" id="navToggle"
+                aria-expanded="false" aria-controls="navLinks" aria-label="Open menu">
           <span></span><span></span><span></span>
         </button>
       </div>
@@ -51,101 +49,82 @@
   <main id="home">
 
     <!-- ============ HERO ============ -->
-   <!-- ============ HERO ============ -->
-<section class="hero hero--full-image" id="home">
+    <section class="hero hero--full-image" id="home">
 
-  <!-- Full Campus Background -->
-  <div class="hero__background">
-    <img
-      src="../photo/campus photo.jpg"
-      alt="University campus"
-      loading="eager"
-    />
-    <div class="hero__background-overlay"></div>
-  </div>
-
-  <!-- Hero Content -->
-  <div class="hero__content container">
-
-    <div class="hero__copy">
-
-      <p class="hero__kicker">
-        SAFE. SMART. ON TIME.
-      </p>
-
-      <h1 class="hero__title">
-        Real-Time University<br>
-        Bus Tracking
-      </h1>
-
-      <p class="hero__sub">
-        Every route bus and shuttle on campus, tracked live on a single map.
-        Students plan their walk to the stop, faculty avoid the wait,
-        and transport administrators watch the whole fleet move —
-        all from one dashboard.
-      </p>
-
-      <div class="hero__cta">
-        <a
-          href="login.html"
-          class="btn btn--primary"
-          id="heroLoginBtn"
-        >
-          Login
-        </a>
-
-        <a
-          href="#features"
-          class="btn btn--hero-outline"
-        >
-          Explore Features
-        </a>
+      <!-- Full Campus Background -->
+      <div class="hero__background">
+        <img
+          src="../photo/campus photo.jpg"
+          alt="University campus"
+          loading="eager"
+          fetchpriority="high"
+        />
+        <div class="hero__background-overlay"></div>
       </div>
 
-      <!-- Statistics -->
-      <dl class="hero__stats">
+      <!-- Hero Content -->
+      <div class="hero__content container">
 
-        <div>
-          <dt>24</dt>
-          <dd>Routes &amp; shuttles</dd>
+        <div class="hero__copy">
+
+          <p class="hero__kicker">SAFE. SMART. ON TIME.</p>
+
+          <h1 class="hero__title">
+            Real-Time University<br>
+            Bus Tracking
+          </h1>
+
+          <p class="hero__sub">
+            Every route bus and shuttle on campus, tracked live on a single map.
+            Students plan their walk to the stop, faculty avoid the wait,
+            and transport administrators watch the whole fleet move —
+            all from one dashboard.
+          </p>
+
+          <div class="hero__cta">
+            <a href="login.html" class="btn btn--primary" id="heroLoginBtn">Login</a>
+            <a href="#features"  class="btn btn--hero-outline">Explore Features</a>
+          </div>
+
+          <!-- Statistics -->
+          <dl class="hero__stats">
+            <div>
+              <dt>8+</dt>
+              <dd>Routes &amp; shuttles services </dd>
+            </div>
+            <div>
+              <dt>&lt;10s</dt>
+              <dd>Location refresh</dd>
+            </div>
+            <div>
+              <dt>3</dt>
+              <dd>User roles served</dd>
+            </div>
+          </dl>
+
         </div>
 
-        <div>
-          <dt>&lt;10s</dt>
-          <dd>Location refresh</dd>
+        <!-- University Bus -->
+        <div class="hero__bus">
+          <!-- <img
+            src="../photo/bus.jpg"
+            alt="University bus"
+            loading="eager"
+          /> -->
         </div>
 
-        <div>
-          <dt>3</dt>
-          <dd>User roles served</dd>
-        </div>
-
-      </dl>
-
-    </div>
-
-    <!-- University Bus -->
-    <div class="hero__bus">
-      <img
-        src="../images/university-bus.jpg"
-        alt="University bus"
-        loading="eager"
-      />
-    </div>
-
-  </div>
-
-</section>
+      </div>
+    </section>
 
     <!-- ============ FEATURES ============ -->
     <section class="features container" id="features">
-      <div class="section-head">
+      <div class="section-head" data-reveal>
         <h2>Built for the way campuses actually move</h2>
         <p>Four tools, one live feed — everything students, faculty and administrators need to trust the bus schedule again.</p>
       </div>
 
       <ul class="feature-list">
-        <li class="feature-item">
+        <li class="feature-item" data-reveal data-reveal-delay="1">
           <span class="feature-item__num">01</span>
           <div class="feature-item__icon">
             <svg viewBox="0 0 24 24" fill="none"><path d="M12 21s7-6.2 7-11a7 7 0 10-14 0c0 4.8 7 11 7 11z" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="10" r="2.4" stroke="currentColor" stroke-width="1.6"/></svg>
@@ -154,7 +133,7 @@
           <p>See every active bus move on the map in real time, sourced directly from each driver's GPS feed.</p>
         </li>
 
-        <li class="feature-item">
+        <li class="feature-item" data-reveal data-reveal-delay="2">
           <span class="feature-item__num">02</span>
           <div class="feature-item__icon">
             <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.6"/><path d="M12 7.5V12l3 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
@@ -163,7 +142,7 @@
           <p>Know exactly when your bus reaches your stop, with arrival estimates that update as traffic changes.</p>
         </li>
 
-        <li class="feature-item">
+        <li class="feature-item" data-reveal data-reveal-delay="3">
           <span class="feature-item__num">03</span>
           <div class="feature-item__icon">
             <svg viewBox="0 0 24 24" fill="none"><path d="M4 18l4-13 4 9 3-6 5 10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -172,7 +151,7 @@
           <p>Browse every route's full stop list, timing and shuttle frequency before you leave for class.</p>
         </li>
 
-        <li class="feature-item">
+        <li class="feature-item" data-reveal data-reveal-delay="4">
           <span class="feature-item__num">04</span>
           <div class="feature-item__icon">
             <svg viewBox="0 0 24 24" fill="none"><rect x="3.5" y="4" width="17" height="12" rx="1.4" stroke="currentColor" stroke-width="1.6"/><path d="M8 20h8M12 16v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
@@ -185,31 +164,31 @@
 
     <!-- ============ HOW IT WORKS ============ -->
     <section class="how container" id="how-it-works">
-      <div class="section-head">
+      <div class="section-head" data-reveal>
         <h2>How the tracking data reaches you</h2>
         <p>One continuous pipeline, from the driver's phone to your screen.</p>
       </div>
 
       <ol class="steps">
-        <li class="step">
+        <li class="step" data-reveal data-reveal-delay="1">
           <span class="step__index">1</span>
           <h3>Driver GPS</h3>
           <p>The driver's device shares a live location signal from behind the wheel.</p>
         </li>
         <li class="step__connector" aria-hidden="true"></li>
-        <li class="step">
+        <li class="step" data-reveal data-reveal-delay="2">
           <span class="step__index">2</span>
           <h3>Real-Time Data</h3>
           <p>Location updates stream continuously through the tracking pipeline.</p>
         </li>
         <li class="step__connector" aria-hidden="true"></li>
-        <li class="step">
+        <li class="step" data-reveal data-reveal-delay="3">
           <span class="step__index">3</span>
           <h3>Bus Tracking System</h3>
           <p>The platform maps each bus to its route and calculates live arrival times.</p>
         </li>
         <li class="step__connector" aria-hidden="true"></li>
-        <li class="step">
+        <li class="step" data-reveal data-reveal-delay="4">
           <span class="step__index">4</span>
           <h3>Student / Faculty / Admin</h3>
           <p>Everyone views the same live map, tuned to what their role needs to see.</p>
@@ -219,13 +198,13 @@
 
     <!-- ============ BUS TYPES ============ -->
     <section class="bus-types container" id="about">
-      <div class="section-head">
+      <div class="section-head" data-reveal>
         <h2>Two kinds of buses, one live map</h2>
         <p>The fleet is split by purpose — long-haul routes and quick internal shuttles — both tracked the same way.</p>
       </div>
 
       <div class="type-grid">
-        <article class="type-card">
+        <article class="type-card" data-reveal data-reveal-delay="1">
           <span class="type-card__tag">Route</span>
           <h3>Route Bus</h3>
           <p>Fixed routes with multiple predefined stops and live location tracking, connecting hostels, gates and departments across campus and the city.</p>
@@ -236,9 +215,9 @@
           </ul>
         </article>
 
-        <article class="type-card type-card--shuttle">
-          <span class="type-card__tag">Shuttle</span>
-          <h3>Shuttle Bus</h3>
+        <article class="type-card type-card--shuttle" data-reveal data-reveal-delay="2">
+          <span class="type-card__tag">Shuttle Services </span>
+          <h3>Shuttle Services Bus</h3>
           <p>Short campus and internal routes with frequent service and live tracking, built for quick hops between blocks, hostels and the main gate.</p>
           <ul class="type-card__meta">
             <li>Short internal loops</li>
@@ -251,10 +230,10 @@
 
     <!-- ============ CTA ============ -->
     <section class="cta">
-      <div class="container cta__inner">
+      <div class="container cta__inner" data-reveal>
         <h2>Track Your University Bus in Real Time</h2>
         <p>Sign in with your university account to see live positions, arrival times and your saved routes.</p>
-        <a href="login.html" class="btn btn--primary btn--lg" id="ctaLoginBtn">Login to Continue</a>
+        <a href="login.html" class="btn btn--inverted btn--lg" id="ctaLoginBtn">Login to Continue</a>
       </div>
     </section>
 
@@ -267,9 +246,9 @@
         <span class="navbar__mark" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect x="2" y="5" width="20" height="12" rx="2.2" fill="currentColor"/>
-            <rect x="4.5" y="7.2" width="4.2" height="4" rx="0.6" fill="var(--navy)"/>
-            <rect x="9.7" y="7.2" width="4.2" height="4" rx="0.6" fill="var(--navy)"/>
-            <rect x="14.9" y="7.2" width="4.2" height="4" rx="0.6" fill="var(--navy)"/>
+            <rect x="4.5" y="7.2" width="4.2" height="4" rx="0.6" fill="#0B1826"/>
+            <rect x="9.7" y="7.2" width="4.2" height="4" rx="0.6" fill="#0B1826"/>
+            <rect x="14.9" y="7.2" width="4.2" height="4" rx="0.6" fill="#0B1826"/>
             <circle cx="7" cy="19" r="1.9" fill="currentColor"/>
             <circle cx="17" cy="19" r="1.9" fill="currentColor"/>
           </svg>
@@ -296,8 +275,8 @@
 
       <div class="footer__col">
         <h4>Contact</h4>
-        <a href="mailto:transport@university.edu">transport@university.edu</a>
-        <a href="tel:+910000000000">+91 00000 00000</a>
+        <a href="mailto:transport@university.edu">www.chanakyauniversity.edu.in</a>
+        <a href="tel:+910000000000">+91 80312 33103</a>
         <p class="footer__addr">Transport Office, Main Campus</p>
       </div>
     </div>

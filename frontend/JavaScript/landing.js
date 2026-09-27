@@ -1,38 +1,47 @@
 /* =========================================================
-   CampusTransit Live — main.js
-   Landing page behaviour only. No API calls, no backend
-   assumptions — safe to reuse this file's patterns on
-   future pages.
+   CampusTransit Live — landing.js  (improved)
    ========================================================= */
-
 document.addEventListener("DOMContentLoaded", () => {
   initMobileNav();
+  initNavbarScroll();
   initScrollSpy();
+  initScrollReveal();
   initFooterYear();
   initLoginButtons();
 });
 
+/* ---------- Navbar: scroll elevation ---------- */
+function initNavbarScroll() {
+  const navbar = document.getElementById("navbar");
+  if (!navbar) return;
+  const onScroll = () =>
+    navbar.classList.toggle("is-scrolled", window.scrollY > 20);
+  window.addEventListener("scroll", onScroll, { passive: true });
+  onScroll();
+}
+
 /* ---------- Mobile nav toggle ---------- */
 function initMobileNav() {
   const toggle = document.getElementById("navToggle");
-  const links = document.getElementById("navLinks");
+  const links  = document.getElementById("navLinks");
   if (!toggle || !links) return;
 
   toggle.addEventListener("click", () => {
     const isOpen = links.classList.toggle("is-open");
+    toggle.classList.toggle("is-active", isOpen);
     toggle.setAttribute("aria-expanded", String(isOpen));
   });
 
-  // Close the mobile menu after a nav link is tapped
   links.querySelectorAll(".navbar__link").forEach((link) => {
     link.addEventListener("click", () => {
       links.classList.remove("is-open");
+      toggle.classList.remove("is-active");
       toggle.setAttribute("aria-expanded", "false");
     });
   });
 }
 
-/* ---------- Highlight the nav link for the section in view ---------- */
+/* ---------- Scroll spy ---------- */
 function initScrollSpy() {
   const sections = ["home", "features", "how-it-works", "about"]
     .map((id) => document.getElementById(id))
@@ -55,8 +64,26 @@ function initScrollSpy() {
     },
     { rootMargin: "-40% 0px -50% 0px", threshold: 0 }
   );
+  sections.forEach((s) => observer.observe(s));
+}
 
-  sections.forEach((section) => observer.observe(section));
+/* ---------- Scroll reveal ---------- */
+function initScrollReveal() {
+  const els = document.querySelectorAll("[data-reveal]");
+  if (!els.length) return;
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add("is-visible");
+          observer.unobserve(entry.target);
+        }
+      });
+    },
+    { threshold: 0.12 }
+  );
+  els.forEach((el) => observer.observe(el));
 }
 
 /* ---------- Footer year ---------- */
@@ -65,15 +92,7 @@ function initFooterYear() {
   if (yearEl) yearEl.textContent = new Date().getFullYear();
 }
 
-/* ---------- Login button routing ----------
-   All Login CTAs on this page point to login.html via
-   their href attribute already, so no click handler is
-   strictly required. This hook exists so a future page
-   (or an auth check) can intercept the click without
-   editing the HTML — e.g. redirecting to a role-specific
-   dashboard once login.html exists and a session check
-   is available. Currently it just lets the default link
-   navigation happen. */
+/* ---------- Login button routing ---------- */
 function initLoginButtons() {
   const loginButtons = [
     document.getElementById("navLoginBtn"),
@@ -83,8 +102,7 @@ function initLoginButtons() {
 
   loginButtons.forEach((btn) => {
     btn.addEventListener("click", () => {
-      // Placeholder for future logic (e.g. analytics, session
-      // check). Navigation itself is handled by href="login.html".
+      /* Placeholder for future analytics / session check. */
     });
   });
 }

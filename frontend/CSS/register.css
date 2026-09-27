@@ -1,0 +1,1327 @@
+/* =========================================================
+   CHANAKYA UNIVERSITY
+   REAL-TIME UNIVERSITY BUS TRACKING
+   REGISTER PAGE
+   ========================================================= */
+
+:root {
+    --navy: #061a38;
+    --navy-2: #092d60;
+    --navy-3: #1058a8;
+
+    --blue: #246bdd;
+    --blue-dark: #1557bd;
+    --blue-soft: #edf4ff;
+
+    --gold: #f5b83d;
+    --gold-light: #ffc95c;
+
+    --white: #ffffff;
+    --text: #10233f;
+    --muted: #718096;
+
+    --border: #dce4ef;
+
+    --danger: #d94b4b;
+}
+
+
+/* =========================================================
+   RESET
+   ========================================================= */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html,
+body {
+    width: 100%;
+    min-height: 100%;
+}
+
+body {
+    min-height: 100vh;
+
+    font-family: "Inter", Arial, sans-serif;
+
+    background: var(--navy);
+
+    color: var(--text);
+
+    overflow-x: hidden;
+}
+
+button,
+input,
+select {
+    font-family: inherit;
+}
+
+button {
+    cursor: pointer;
+}
+
+
+/* =========================================================
+   MAIN PAGE
+   ========================================================= */
+
+.register-page {
+    position: relative;
+
+    width: 100%;
+    min-height: 100vh;
+
+    overflow: hidden;
+}
+
+
+/* =========================================================
+   LEFT / FULL BLUE BACKGROUND
+   ========================================================= */
+
+.brand-panel {
+    position: absolute;
+
+    inset: 0;
+
+    width: 100%;
+    min-height: 100vh;
+
+    padding: 34px 50px;
+
+    display: flex;
+    flex-direction: column;
+
+    color: #ffffff;
+
+    overflow: hidden;
+
+    background:
+        radial-gradient(
+            circle at 90% 85%,
+            rgba(48, 125, 229, 0.28),
+            transparent 30%
+        ),
+        radial-gradient(
+            circle at 10% 15%,
+            rgba(50, 117, 221, 0.22),
+            transparent 30%
+        ),
+        linear-gradient(
+            135deg,
+            #061a38 0%,
+            #092d60 50%,
+            #1058a8 100%
+        );
+}
+
+
+/* =========================================================
+   BACKGROUND PATTERN
+   ========================================================= */
+
+.brand-pattern {
+    position: absolute;
+
+    inset: 0;
+
+    pointer-events: none;
+
+    background-image:
+        radial-gradient(
+            rgba(255,255,255,0.10) 1px,
+            transparent 1px
+        );
+
+    background-size: 25px 25px;
+
+    opacity: .28;
+}
+
+
+/* =========================================================
+   DECORATIVE CIRCLES
+   ========================================================= */
+
+.brand-panel::before {
+    content: "";
+
+    position: absolute;
+
+    width: 700px;
+    height: 700px;
+
+    right: -350px;
+    bottom: -330px;
+
+    border-radius: 50%;
+
+    border: 90px solid rgba(255,255,255,.035);
+
+    pointer-events: none;
+}
+
+.brand-panel::after {
+    content: "";
+
+    position: absolute;
+
+    width: 500px;
+    height: 500px;
+
+    right: -250px;
+    bottom: -220px;
+
+    border-radius: 50%;
+
+    border: 1px solid rgba(255,255,255,.07);
+
+    pointer-events: none;
+}
+
+
+/* =========================================================
+   UNIVERSITY LOGO
+   ========================================================= */
+
+.brand-header {
+    position: relative;
+
+    z-index: 5;
+
+    display: flex;
+    align-items: center;
+}
+
+.university-logo {
+    display: inline-flex;
+
+    align-items: center;
+
+    text-decoration: none;
+}
+
+.university-logo img {
+    width: 250px;
+    height: 65px;
+
+    display: block;
+
+    object-fit: contain;
+
+    object-position: left center;
+
+    /* Make dark logo visible on blue */
+    filter:
+        brightness(0)
+        invert(1);
+
+    opacity: 1;
+}
+
+
+/* =========================================================
+   LEFT CONTENT
+   ========================================================= */
+
+.brand-content {
+    position: relative;
+
+    z-index: 5;
+
+    width: 48%;
+    max-width: 610px;
+
+    margin: auto 0;
+}
+
+
+/* =========================================================
+   EYEBROW
+   ========================================================= */
+
+.eyebrow {
+    margin-bottom: 18px;
+
+    color: rgba(255,255,255,.78);
+
+    font-size: 11px;
+    font-weight: 800;
+
+    letter-spacing: 1.8px;
+
+    line-height: 1.5;
+
+    text-transform: uppercase;
+}
+
+.eyebrow span {
+    margin: 0 7px;
+
+    color: var(--gold);
+}
+
+
+/* =========================================================
+   MAIN HEADING
+   ========================================================= */
+
+.brand-content h1 {
+    margin-bottom: 19px;
+
+    font-family: "Archivo", sans-serif;
+
+    font-size: clamp(42px, 5vw, 67px);
+
+    line-height: 1.02;
+
+    letter-spacing: -2.5px;
+
+    color: #ffffff;
+}
+
+.brand-content h1 span {
+    color: var(--gold-light);
+}
+
+
+/* =========================================================
+   DESCRIPTION
+   ========================================================= */
+
+.brand-description {
+    max-width: 570px;
+
+    margin-bottom: 30px;
+
+    color: rgba(255,255,255,.72);
+
+    font-size: 14px;
+
+    line-height: 1.75;
+}
+
+
+/* =========================================================
+   FEATURE LIST
+   ========================================================= */
+
+.feature-list {
+    display: flex;
+
+    gap: 12px;
+
+    max-width: 455px;
+}
+
+.feature-card {
+    min-width: 190px;
+
+    padding: 13px 15px;
+
+    display: flex;
+    align-items: center;
+
+    gap: 12px;
+
+    border: 1px solid rgba(255,255,255,.14);
+
+    border-radius: 12px;
+
+    background: rgba(255,255,255,.07);
+
+    backdrop-filter: blur(10px);
+
+    transition: .2s;
+}
+
+.feature-card:hover {
+    transform: translateY(-2px);
+
+    background: rgba(255,255,255,.10);
+
+    border-color: rgba(255,255,255,.20);
+}
+
+
+/* =========================================================
+   FEATURE ICON
+   ========================================================= */
+
+.feature-icon {
+    width: 39px;
+    height: 39px;
+
+    flex-shrink: 0;
+
+    display: grid;
+    place-items: center;
+
+    border-radius: 10px;
+
+    background:
+        linear-gradient(
+            145deg,
+            #2d76e4,
+            #1557bd
+        );
+
+    color: #ffffff;
+
+    box-shadow:
+        0 7px 15px rgba(0,0,0,.15);
+}
+
+.feature-icon svg {
+    width: 19px;
+    height: 19px;
+}
+
+
+/* =========================================================
+   FEATURE TEXT
+   ========================================================= */
+
+.feature-card strong {
+    display: block;
+
+    margin-bottom: 3px;
+
+    color: #ffffff;
+
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.feature-card small {
+    display: block;
+
+    color: rgba(255,255,255,.55);
+
+    font-size: 9px;
+}
+
+
+/* =========================================================
+   BRAND FOOTER
+   ========================================================= */
+
+.brand-footer {
+    position: relative;
+
+    z-index: 5;
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 10px;
+
+    color: rgba(255,255,255,.48);
+
+    font-size: 10px;
+}
+
+.footer-dot {
+    width: 4px;
+    height: 4px;
+
+    border-radius: 50%;
+
+    background: var(--gold);
+}
+
+
+/* =========================================================
+   RIGHT FORM PANEL
+   ========================================================= */
+
+.form-panel {
+    position: absolute;
+
+    top: 0;
+    right: 0;
+
+    width: 46%;
+    height: 100vh;
+
+    z-index: 20;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    padding: 20px 50px;
+
+    background: transparent;
+
+    overflow-y: auto;
+
+    pointer-events: none;
+}
+
+
+/* =========================================================
+   FORM CONTAINER
+   ========================================================= */
+
+.form-container {
+    width: 100%;
+
+    max-width: 475px;
+
+    pointer-events: auto;
+}
+
+
+/* =========================================================
+   BACK TO LOGIN
+   ========================================================= */
+
+.back-link {
+    display: inline-flex;
+
+    align-items: center;
+
+    gap: 6px;
+
+    margin-bottom: 9px;
+
+    padding: 7px 11px;
+
+    border-radius: 20px;
+
+    color: rgba(255,255,255,.90);
+
+    background: rgba(255,255,255,.08);
+
+    border: 1px solid rgba(255,255,255,.08);
+
+    backdrop-filter: blur(10px);
+
+    text-decoration: none;
+
+    font-size: 11px;
+    font-weight: 700;
+
+    transition: .2s;
+}
+
+.back-link:hover {
+    background: rgba(255,255,255,.15);
+
+    transform: translateX(-2px);
+}
+
+
+/* =========================================================
+   REGISTER CARD
+   ========================================================= */
+
+.register-card {
+    width: 100%;
+
+    padding: 27px 32px 22px;
+
+    border-radius: 21px;
+
+    background:
+        linear-gradient(
+            180deg,
+            rgba(255,255,255,.99),
+            rgba(249,251,255,.98)
+        );
+
+    border: 1px solid rgba(255,255,255,.75);
+
+    box-shadow:
+        0 30px 70px rgba(0,0,0,.28),
+        0 10px 25px rgba(0,0,0,.10);
+
+    backdrop-filter: blur(20px);
+}
+
+
+/* =========================================================
+   CARD HEADER
+   ========================================================= */
+
+.card-header {
+    margin-bottom: 16px;
+}
+
+.register-icon {
+    width: 48px;
+    height: 48px;
+
+    margin-bottom: 12px;
+
+    display: grid;
+    place-items: center;
+
+    border-radius: 14px;
+
+    background:
+        linear-gradient(
+            145deg,
+            #2e73df,
+            #1557bd
+        );
+
+    color: #ffffff;
+
+    box-shadow:
+        0 10px 23px rgba(23,105,209,.24);
+}
+
+.register-icon svg {
+    width: 22px;
+    height: 22px;
+}
+
+
+.welcome-text {
+    margin-bottom: 4px;
+
+    color: #d79218;
+
+    font-size: 9px;
+    font-weight: 800;
+
+    letter-spacing: 1.4px;
+
+    text-transform: uppercase;
+}
+
+.card-header h2 {
+    margin-bottom: 4px;
+
+    color: #0b1d38;
+
+    font-family: "Archivo", sans-serif;
+
+    font-size: 25px;
+
+    line-height: 1.2;
+}
+
+.card-description {
+    color: #718096;
+
+    font-size: 11px;
+
+    line-height: 1.5;
+}
+
+
+/* =========================================================
+   FORM
+   ========================================================= */
+
+#registerForm {
+    width: 100%;
+}
+
+
+/* =========================================================
+   FIELD
+   ========================================================= */
+
+.field {
+    margin-bottom: 12px;
+}
+
+.field label {
+    display: block;
+
+    margin-bottom: 5px;
+
+    color: #30445d;
+
+    font-size: 10px;
+
+    font-weight: 800;
+}
+
+
+/* =========================================================
+   INPUT WRAPPER
+   ========================================================= */
+
+.input-wrapper {
+    position: relative;
+
+    width: 100%;
+
+    min-height: 43px;
+
+    display: flex;
+
+    align-items: center;
+
+    border: 1px solid var(--border);
+
+    border-radius: 9px;
+
+    background: #ffffff;
+
+    transition:
+        border .2s ease,
+        box-shadow .2s ease;
+}
+
+.input-wrapper:hover {
+    border-color: #bccbe0;
+}
+
+.input-wrapper:focus-within {
+    border-color: var(--blue);
+
+    box-shadow:
+        0 0 0 4px rgba(36,107,221,.10);
+}
+
+
+/* =========================================================
+   INPUT ICON
+   ========================================================= */
+
+.input-icon {
+    position: absolute;
+
+    left: 12px;
+
+    z-index: 2;
+
+    display: grid;
+
+    place-items: center;
+
+    color: #71839a;
+
+    pointer-events: none;
+
+    font-size: 13px;
+}
+
+.input-icon svg {
+    width: 17px;
+    height: 17px;
+}
+
+
+/* =========================================================
+   INPUT
+   ========================================================= */
+
+.input-wrapper input {
+    width: 100%;
+
+    height: 41px;
+
+    padding:
+        10px
+        42px
+        10px
+        37px;
+
+    border: 0;
+
+    outline: none;
+
+    border-radius: 9px;
+
+    background: transparent;
+
+    color: #10233f;
+
+    font-size: 11px;
+}
+
+.input-wrapper input::placeholder {
+    color: #9aa8ba;
+}
+
+
+/* =========================================================
+   SELECT
+   ========================================================= */
+
+.select-wrapper select {
+    width: 100%;
+
+    height: 41px;
+
+    padding:
+        10px
+        35px
+        10px
+        37px;
+
+    border: 0;
+
+    outline: none;
+
+    border-radius: 9px;
+
+    background: transparent;
+
+    color: #30445d;
+
+    font-size: 11px;
+
+    appearance: auto;
+
+    cursor: pointer;
+}
+
+.select-wrapper select:invalid {
+    color: #9aa8ba;
+}
+
+
+/* =========================================================
+   PASSWORD TOGGLE
+   ========================================================= */
+
+.password-toggle {
+    position: absolute;
+
+    right: 7px;
+
+    padding: 6px 8px;
+
+    border: 0;
+
+    border-radius: 6px;
+
+    background: transparent;
+
+    color: var(--blue);
+
+    font-size: 9px;
+
+    font-weight: 800;
+
+    cursor: pointer;
+}
+
+.password-toggle:hover {
+    background: var(--blue-soft);
+}
+
+
+/* =========================================================
+   EXTRA ROLE FIELDS
+   ========================================================= */
+
+.extra-fields {
+    width: 100%;
+
+    padding: 10px 11px 3px;
+
+    margin-bottom: 4px;
+
+    border-radius: 10px;
+
+    background: #f6f9fd;
+
+    border: 1px solid #e6edf6;
+}
+
+
+/*
+   Hidden attribute is controlled by register.js.
+   Do NOT force display here when hidden.
+*/
+
+.extra-fields[hidden] {
+    display: none;
+}
+
+
+/* =========================================================
+   TERMS
+   ========================================================= */
+
+.terms {
+    margin: 4px 0 13px;
+
+    display: flex;
+
+    align-items: flex-start;
+
+    gap: 7px;
+
+    color: #718096;
+
+    font-size: 8px;
+
+    line-height: 1.45;
+
+    cursor: pointer;
+}
+
+.terms input {
+    width: 14px;
+    height: 14px;
+
+    flex-shrink: 0;
+
+    margin-top: 1px;
+
+    accent-color: var(--blue);
+
+    cursor: pointer;
+}
+
+.terms a {
+    color: var(--blue);
+
+    font-weight: 700;
+
+    text-decoration: none;
+}
+
+.terms a:hover {
+    text-decoration: underline;
+}
+
+
+/* =========================================================
+   FORM MESSAGE
+   ========================================================= */
+
+.form-message {
+    min-height: 16px;
+
+    margin-top: 5px;
+
+    margin-bottom: 4px;
+
+    color: var(--danger);
+
+    font-size: 9px;
+
+    font-weight: 600;
+
+    line-height: 1.4;
+
+    text-align: center;
+}
+
+
+/* =========================================================
+   REGISTER BUTTON
+   ========================================================= */
+
+.register-btn {
+    width: 100%;
+
+    min-height: 46px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    gap: 9px;
+
+    border: 0;
+
+    border-radius: 9px;
+
+    background:
+        linear-gradient(
+            135deg,
+            #2e73df,
+            #1557bd
+        );
+
+    color: #ffffff;
+
+    font-size: 11px;
+
+    font-weight: 800;
+
+    box-shadow:
+        0 12px 25px rgba(23,105,209,.24);
+
+    transition:
+        transform .2s ease,
+        box-shadow .2s ease,
+        opacity .2s ease;
+}
+
+.register-btn:hover {
+    transform: translateY(-1px);
+
+    box-shadow:
+        0 16px 30px rgba(23,105,209,.30);
+}
+
+.register-btn:active {
+    transform: translateY(0);
+}
+
+.register-btn:disabled {
+    opacity: .65;
+
+    cursor: wait;
+
+    transform: none;
+}
+
+.btn-arrow {
+    font-size: 16px;
+
+    line-height: 1;
+}
+
+
+/* =========================================================
+   LOGIN LINK
+   ========================================================= */
+
+.login-link {
+    margin-top: 13px;
+
+    color: #7b899a;
+
+    font-size: 9px;
+
+    text-align: center;
+}
+
+.login-link a {
+    margin-left: 4px;
+
+    color: var(--blue);
+
+    font-weight: 800;
+
+    text-decoration: none;
+}
+
+.login-link a:hover {
+    text-decoration: underline;
+}
+
+
+/* =========================================================
+   TABLET
+   ========================================================= */
+
+@media (max-width: 1050px) {
+
+    .brand-panel {
+        padding-left: 35px;
+        padding-right: 35px;
+    }
+
+    .form-panel {
+        width: 48%;
+
+        padding-left: 25px;
+        padding-right: 25px;
+    }
+
+    .brand-content {
+        width: 50%;
+    }
+
+    .brand-content h1 {
+        font-size: 48px;
+    }
+
+    .brand-description {
+        font-size: 12px;
+    }
+
+    .feature-card {
+        min-width: 165px;
+    }
+
+    .university-logo img {
+        width: 220px;
+        height: 58px;
+    }
+
+    .register-card {
+        padding-left: 25px;
+        padding-right: 25px;
+    }
+}
+
+
+/* =========================================================
+   SHORT DESKTOP
+   ========================================================= */
+
+@media (min-width: 761px) and (max-height: 760px) {
+
+    .brand-panel {
+        padding-top: 20px;
+        padding-bottom: 20px;
+    }
+
+    .university-logo img {
+        width: 220px;
+        height: 55px;
+    }
+
+    .brand-content h1 {
+        font-size: 41px;
+    }
+
+    .brand-description {
+        margin-bottom: 17px;
+
+        font-size: 11px;
+    }
+
+    .register-card {
+        padding:
+            20px
+            27px
+            17px;
+    }
+
+    .register-icon {
+        width: 41px;
+        height: 41px;
+
+        margin-bottom: 8px;
+    }
+
+    .card-header h2 {
+        font-size: 21px;
+    }
+
+    .card-header {
+        margin-bottom: 10px;
+    }
+
+    .field {
+        margin-bottom: 8px;
+    }
+
+    .input-wrapper {
+        min-height: 39px;
+    }
+
+    .input-wrapper input,
+    .select-wrapper select {
+        height: 37px;
+    }
+
+    .register-btn {
+        min-height: 42px;
+    }
+
+    .terms {
+        margin-bottom: 9px;
+    }
+}
+
+
+/* =========================================================
+   MOBILE
+   ========================================================= */
+
+@media (max-width: 760px) {
+
+    body {
+        overflow-y: auto;
+    }
+
+    .register-page {
+        min-height: 100vh;
+    }
+
+    .brand-panel {
+        position: relative;
+
+        min-height: 100vh;
+
+        padding:
+            25px
+            20px
+            30px;
+
+        display: flex;
+
+        flex-direction: column;
+
+        justify-content: flex-start;
+    }
+
+    .university-logo img {
+        width: 190px;
+        height: auto;
+    }
+
+    .brand-content {
+        width: 100%;
+
+        max-width: 500px;
+
+        margin: 75px auto 0;
+    }
+
+    .eyebrow {
+        font-size: 9px;
+
+        letter-spacing: 1.3px;
+    }
+
+    .brand-content h1 {
+        font-size: 39px;
+
+        letter-spacing: -1.2px;
+    }
+
+    .brand-description {
+        font-size: 11px;
+
+        line-height: 1.65;
+    }
+
+    .feature-list {
+        display: none;
+    }
+
+    .brand-footer {
+        margin-top: auto;
+
+        font-size: 9px;
+    }
+
+    /* Register card overlay */
+
+    .form-panel {
+        position: absolute;
+
+        top: 115px;
+        right: 0;
+
+        width: 100%;
+
+        height: auto;
+
+        min-height: calc(100vh - 115px);
+
+        padding:
+            20px
+            16px
+            40px;
+
+        align-items: flex-start;
+
+        justify-content: center;
+    }
+
+    .form-container {
+        width: 100%;
+
+        max-width: 430px;
+    }
+
+    .register-card {
+        padding:
+            25px
+            22px
+            22px;
+
+        border-radius: 18px;
+    }
+
+    .card-header h2 {
+        font-size: 23px;
+    }
+}
+
+
+/* =========================================================
+   SMALL MOBILE
+   ========================================================= */
+
+@media (max-width: 430px) {
+
+    .brand-panel {
+        padding:
+            20px
+            16px
+            25px;
+    }
+
+    .university-logo img {
+        width: 175px;
+    }
+
+    .brand-content {
+        margin-top: 70px;
+    }
+
+    .brand-content h1 {
+        font-size: 34px;
+
+        line-height: 1.05;
+    }
+
+    .brand-description {
+        max-width: 100%;
+
+        font-size: 10px;
+    }
+
+    .form-panel {
+        top: 105px;
+
+        min-height: calc(100vh - 105px);
+
+        padding:
+            16px
+            12px
+            30px;
+    }
+
+    .register-card {
+        padding:
+            23px
+            18px
+            20px;
+
+        border-radius: 17px;
+    }
+
+    .register-icon {
+        width: 45px;
+        height: 45px;
+
+        margin-bottom: 11px;
+    }
+
+    .card-header h2 {
+        font-size: 21px;
+    }
+
+    .card-description {
+        font-size: 10px;
+    }
+
+    .input-wrapper input,
+    .select-wrapper select {
+        font-size: 10px;
+    }
+
+    .terms {
+        font-size: 8px;
+    }
+}

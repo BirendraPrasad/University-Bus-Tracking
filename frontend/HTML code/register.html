@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Register | Chanakya University Bus Tracking</title>
+
+    <meta
+        name="description"
+        content="Create your Chanakya University Real-Time Bus Tracking System account."
+    >
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <link
+        href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap"
+        rel="stylesheet"
+    >
+
+    <!-- Register CSS -->
+    <link rel="stylesheet" href="../CSS/register.css">
+</head>
+
+<body>
+
+<main class="register-page">
+
+    <!-- ==================================================
+         LEFT BRANDING
+         ================================================== -->
+
+    <section class="brand-panel">
+
+        <div class="brand-pattern"></div>
+
+        <header class="brand-header">
+
+            <a href="landing page.html" class="university-logo">
+
+                <img
+                    src="../photo/chanakya-university.svg"
+                    alt="Chanakya University"
+                >
+
+            </a>
+
+        </header>
+
+
+        <div class="brand-content">
+
+            <p class="eyebrow">
+                SMART CAMPUS
+                <span>•</span>
+                SAFE JOURNEY
+                <span>•</span>
+                CONNECTED UNIVERSITY
+            </p>
+
+            <h1>
+                Join the
+                <br>
+                <span>University</span>
+                <br>
+                Transport Network
+            </h1>
+
+            <p class="brand-description">
+
+                Create your account to access real-time bus tracking,
+                routes, estimated arrival times and university
+                transportation services.
+
+            </p>
+
+
+            <!-- Feature cards -->
+
+            <div class="feature-list">
+
+                <div class="feature-card">
+
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none">
+                            <rect
+                                x="3"
+                                y="4"
+                                width="18"
+                                height="13"
+                                rx="2"
+                                stroke="currentColor"
+                                stroke-width="1.8"
+                            />
+
+                            <path
+                                d="M3 10h18"
+                                stroke="currentColor"
+                                stroke-width="1.8"
+                            />
+
+                            <circle
+                                cx="7.5"
+                                cy="19"
+                                r="1.5"
+                                fill="currentColor"
+                            />
+
+                            <circle
+                                cx="16.5"
+                                cy="19"
+                                r="1.5"
+                                fill="currentColor"
+                            />
+                        </svg>
+                    </div>
+
+                    <div>
+                        <strong>Live Bus Tracking</strong>
+                        <small>Know where your bus is</small>
+                    </div>
+
+                </div>
+
+
+                <div class="feature-card">
+
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none">
+
+                            <path
+                                d="M12 3v18"
+                                stroke="currentColor"
+                                stroke-width="1.8"
+                                stroke-linecap="round"
+                            />
+
+                            <path
+                                d="M5 7h14"
+                                stroke="currentColor"
+                                stroke-width="1.8"
+                                stroke-linecap="round"
+                            />
+
+                            <path
+                                d="M7 7l-3 7h6L7 7Z"
+                                stroke="currentColor"
+                                stroke-width="1.6"
+                                stroke-linejoin="round"
+                            />
+
+                            <path
+                                d="M17 7l-3 7h6l-3-7Z"
+                                stroke="currentColor"
+                                stroke-width="1.6"
+                                stroke-linejoin="round"
+                            />
+
+                        </svg>
+                    </div>
+
+                    <div>
+                        <strong>Estimated Arrival</strong>
+                        <small>Plan your journey better</small>
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <footer class="brand-footer">
+
+            <span>
+                © <span id="brandYear"></span> Chanakya University
+            </span>
+
+            <span class="footer-dot"></span>
+
+            <span>
+                Real-Time Transport System
+            </span>
+
+        </footer>
+
+    </section>
+
+
+
+    <!-- ==================================================
+         RIGHT REGISTER AREA
+         ================================================== -->
+
+    <section class="form-panel">
+
+        <div class="form-container">
+
+            <a
+                href="login.html"
+                class="back-link"
+            >
+                ←
+                <span>Back to Login</span>
+            </a>
+
+
+            <div class="register-card">
+
+                <!-- Header -->
+
+                <div class="card-header">
+
+                    <div class="register-icon">
+
+                        <svg viewBox="0 0 24 24" fill="none">
+
+                            <path
+                                d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"
+                                stroke="currentColor"
+                                stroke-width="1.7"
+                                stroke-linecap="round"
+                            />
+
+                            <circle
+                                cx="9"
+                                cy="7"
+                                r="4"
+                                stroke="currentColor"
+                                stroke-width="1.7"
+                            />
+
+                            <path
+                                d="M19 8v6M16 11h6"
+                                stroke="currentColor"
+                                stroke-width="1.7"
+                                stroke-linecap="round"
+                            />
+
+                        </svg>
+
+                    </div>
+
+
+                    <p class="welcome-text">
+                        CREATE ACCOUNT
+                    </p>
+
+                    <h2>
+                        Join University Transport
+                    </h2>
+
+                    <p class="card-description">
+                        Create your account to get started.
+                    </p>
+
+                </div>
+
+
+
+                <!-- Register Form -->
+
+                <form
+                    id="registerForm"
+                    novalidate
+                >
+
+
+                    <!-- Name -->
+
+                    <div class="field">
+
+                        <label for="name">
+                            Full Name
+                        </label>
+
+                        <div class="input-wrapper">
+
+                            <span class="input-icon">
+                                <svg viewBox="0 0 24 24" fill="none">
+
+                                    <circle
+                                        cx="12"
+                                        cy="8"
+                                        r="4"
+                                        stroke="currentColor"
+                                        stroke-width="1.7"
+                                    />
+
+                                    <path
+                                        d="M4 21c0-4 3.5-7 8-7s8 3 8 7"
+                                        stroke="currentColor"
+                                        stroke-width="1.7"
+                                        stroke-linecap="round"
+                                    />
+
+                                </svg>
+                            </span>
+
+                            <input
+                                type="text"
+                                id="name"
+                                name="name"
+                                placeholder="Enter your full name"
+                                autocomplete="name"
+                                required
+                            >
+
+                        </div>
+
+                    </div>
+
+
+
+                    <!-- Email -->
+
+                    <div class="field">
+
+                        <label for="email">
+                            Email Address
+                        </label>
+
+                        <div class="input-wrapper">
+
+                            <span class="input-icon">
+                                <svg viewBox="0 0 24 24" fill="none">
+
+                                    <rect
+                                        x="3"
+                                        y="5"
+                                        width="18"
+                                        height="14"
+                                        rx="2"
+                                        stroke="currentColor"
+                                        stroke-width="1.7"
+                                    />
+
+                                    <path
+                                        d="M3 7l9 6 9-6"
+                                        stroke="currentColor"
+                                        stroke-width="1.7"
+                                    />
+
+                                </svg>
+                            </span>
+
+                            <input
+                                type="email"
+                                id="email"
+                                name="email"
+                                placeholder="Enter your university email"
+                                autocomplete="email"
+                                required
+                            >
+
+                        </div>
+
+                    </div>
+
+
+
+                    <!-- Role -->
+
+                    <div class="field">
+
+                        <label for="role">
+                            Select Role
+                        </label>
+
+                        <div class="input-wrapper select-wrapper">
+
+                            <span class="input-icon">
+
+                                <svg viewBox="0 0 24 24" fill="none">
+
+                                    <path
+                                        d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"
+                                        stroke="currentColor"
+                                        stroke-width="1.7"
+                                        stroke-linecap="round"
+                                    />
+
+                                    <circle
+                                        cx="9"
+                                        cy="7"
+                                        r="4"
+                                        stroke="currentColor"
+                                        stroke-width="1.7"
+                                    />
+
+                                    <path
+                                        d="M19 8v6M16 11h6"
+                                        stroke="currentColor"
+                                        stroke-width="1.7"
+                                        stroke-linecap="round"
+                                    />
+
+                                </svg>
+
+                            </span>
+
+                            <select
+                                id="role"
+                                name="role"
+                                required
+                            >
+
+                                <option value="">
+                                    Select your role
+                                </option>
+
+                                <option value="STUDENT">
+                                    Student
+                                </option>
+
+                                <option value="FACULTY">
+                                    Faculty
+                                </option>
+
+                                <option value="DRIVER">
+                                    Driver — Admin approval required
+                                </option>
+
+                                <option value="ADMIN">
+                                    Admin — Authorized account only
+                                </option>
+
+                            </select>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <!-- Student extra fields -->
+
+                    <div
+                        id="studentFields"
+                        class="extra-fields"
+                        hidden
+                    >
+
+                        <div class="field">
+
+                            <label for="enrollmentNo">
+                                Enrollment Number
+                            </label>
+
+                            <div class="input-wrapper">
+
+                                <span class="input-icon">
+                                    #
+                                </span>
+
+                                <input
+                                    type="text"
+                                    id="enrollmentNo"
+                                    placeholder="Enter enrollment number"
+                                >
+
+                            </div>
+
+                        </div>
+
+
+                        <div class="field">
+
+                            <label for="studentDepartment">
+                                Department
+                            </label>
+
+                            <div class="input-wrapper">
+
+                                <span class="input-icon">
+                                    ◈
+                                </span>
+
+                                <input
+                                    type="text"
+                                    id="studentDepartment"
+                                    placeholder="Enter department"
+                                >
+
+                            </div>
+
+                        </div>
+
+
+                        <div class="field">
+
+                            <label for="semester">
+                                Semester
+                            </label>
+
+                            <div class="input-wrapper">
+
+                                <span class="input-icon">
+                                    S
+                                </span>
+
+                                <input
+                                    type="number"
+                                    id="semester"
+                                    min="1"
+                                    max="12"
+                                    placeholder="Enter semester"
+                                >
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <!-- Faculty extra fields -->
+
+                    <div
+                        id="facultyFields"
+                        class="extra-fields"
+                        hidden
+                    >
+
+                        <div class="field">
+
+                            <label for="employeeId">
+                                Employee ID
+                            </label>
+
+                            <div class="input-wrapper">
+
+                                <span class="input-icon">
+                                    #
+                                </span>
+
+                                <input
+                                    type="text"
+                                    id="employeeId"
+                                    placeholder="Enter employee ID"
+                                >
+
+                            </div>
+
+                        </div>
+
+
+                        <div class="field">
+
+                            <label for="facultyDepartment">
+                                Department
+                            </label>
+
+                            <div class="input-wrapper">
+
+                                <span class="input-icon">
+                                    ◈
+                                </span>
+
+                                <input
+                                    type="text"
+                                    id="facultyDepartment"
+                                    placeholder="Enter department"
+                                >
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <!-- Password -->
+
+                    <div class="field">
+
+                        <label for="password">
+                            Password
+                        </label>
+
+                        <div class="input-wrapper">
+
+                            <span class="input-icon">
+
+                                <svg viewBox="0 0 24 24" fill="none">
+
+                                    <rect
+                                        x="4"
+                                        y="10"
+                                        width="16"
+                                        height="10"
+                                        rx="2"
+                                        stroke="currentColor"
+                                        stroke-width="1.7"
+                                    />
+
+                                    <path
+                                        d="M8 10V7a4 4 0 0 1 8 0v3"
+                                        stroke="currentColor"
+                                        stroke-width="1.7"
+                                    />
+
+                                </svg>
+
+                            </span>
+
+                            <input
+                                type="password"
+                                id="password"
+                                name="password"
+                                placeholder="Create a password"
+                                autocomplete="new-password"
+                                required
+                            >
+
+                            <button
+                                type="button"
+                                id="togglePassword"
+                                class="password-toggle"
+                            >
+                                Show
+                            </button>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <!-- Confirm Password -->
+
+                    <div class="field">
+
+                        <label for="confirmPassword">
+                            Confirm Password
+                        </label>
+
+                        <div class="input-wrapper">
+
+                            <span class="input-icon">
+
+                                <svg viewBox="0 0 24 24" fill="none">
+
+                                    <path
+                                        d="M5 12l4 4L19 6"
+                                        stroke="currentColor"
+                                        stroke-width="1.8"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                    />
+
+                                </svg>
+
+                            </span>
+
+                            <input
+                                type="password"
+                                id="confirmPassword"
+                                name="confirmPassword"
+                                placeholder="Confirm your password"
+                                autocomplete="new-password"
+                                required
+                            >
+
+                        </div>
+
+                    </div>
+
+
+
+                    <!-- Terms -->
+
+                    <label class="terms">
+
+                        <input
+                            type="checkbox"
+                            id="terms"
+                            required
+                        >
+
+                        <span>
+                            I agree to the
+                            <a href="#" id="termsLink">
+                                terms and conditions
+                            </a>
+                        </span>
+
+                    </label>
+
+
+
+                    <!-- Message -->
+
+                    <div
+                        id="formMessage"
+                        class="form-message"
+                        role="alert"
+                        aria-live="polite"
+                    ></div>
+
+
+
+                    <!-- Submit -->
+
+                    <button
+                        type="submit"
+                        id="registerBtn"
+                        class="register-btn"
+                    >
+
+                        <span id="registerBtnText">
+                            Create Account
+                        </span>
+
+                        <span class="btn-arrow">
+                            →
+                        </span>
+
+                    </button>
+
+
+                </form>
+
+
+
+                <!-- Login link -->
+
+                <p class="login-link">
+
+                    Already have an account?
+
+                    <a href="login.html">
+                        Login
+                    </a>
+
+                </p>
+
+
+            </div>
+
+        </div>
+
+    </section>
+
+</main>
+
+
+<script src="../JavaScript/register.js"></script>
+
+</body>
+</html>

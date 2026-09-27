@@ -55,3 +55,19 @@ class StopCreate(BaseModel):
 
 class BusAssignDriver(BaseModel):
     driver_id: int
+
+
+# register
+class RegisterRequest(BaseModel):
+    name: str
+    email: EmailStr
+    password: str
+    role: Literal["STUDENT", "FACULTY", "DRIVER", "ADMIN"]
+
+    # Student details
+    enrollment_no: str | None = None
+    department: str | None = None
+    semester: int | None = None
+
+    # Faculty details
+    employee_id: str | None = None 
