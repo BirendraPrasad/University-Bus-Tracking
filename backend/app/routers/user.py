@@ -6,6 +6,8 @@ from backend.app.schemas.user import ( UserCreate, StudentCreate, DriverCreate, 
              BusCreate, RouteCreate,StopCreate, BusAssignDriver)
 from backend.app.services.security import hash_password
 
+from datetime import date, datetime
+from fastapi import HTTPException
 
 router = APIRouter(
     prefix="/users",
@@ -697,3 +699,93 @@ def assign_driver_to_bus(
 
     finally:
         conn.close()             
+
+# Admin: Create a bus trip
+@router.post("/trips")
+def create_trip(
+    bus_id: int,
+    route_id: int,
+    driver_id: int | None = None,
+    status: str = "SCHEDULED",
+    current_user: dict = Depends(require_admin)
+):
+    conn = get_connection()
+
+    try:
+        with conn.cursor() as cursor:
+
+            # Check bus
+            cursor.execute("""
+                SELECT bus_id
+                FROM buses
+                WHERE bus_id = %s
+            """, (bus_id,))
+
+            bus = cursor.fetchone()
+
+            if not bus:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Bus not found"
+                )
+
+            # Check route
+            cursor.execute("""
+                SELECT route_id
+                FROM routes
+                WHERE route_id = %s
+                  AND is_active = TRUE
+            """, (route_id,))
+
+            route = cursor.fetchone()
+
+            if not route:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Route not found or inactive"
+                )
+
+            # Create trip
+            cursor.execute("""
+                INSERT INTO trips
+                    (bus_id, route_id, driver_id, trip_date, status)
+                VALUES
+                    (%s, %s, %s, CURRENT_DATE, %s)
+                RETURNING
+                    trip_id,
+                    bus_id,
+                    route_id,
+                    driver_id,
+                    trip_date,
+                    status
+            """, (
+                bus_id,
+                route_id,
+                driver_id,
+                status
+            ))
+
+            trip = cursor.fetchone()
+
+            conn.commit()
+
+            return {
+                "message": "Trip created successfully",
+                "trip_id": trip[0],
+                "bus_id": trip[1],
+                "route_id": trip[2],
+                "driver_id": trip[3],
+                "trip_date": str(trip[4]),
+                "status": trip[5]
+            }
+
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception:
+        conn.rollback()
+        raise
+
+    finally:
+        conn.close()        

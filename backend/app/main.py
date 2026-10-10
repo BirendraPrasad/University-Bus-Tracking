@@ -2,6 +2,8 @@ from fastapi import FastAPI
 from backend.app.database.connection import get_connection
 from backend.app.routers.user import router as user_router
 from backend.app.routers.auth import router as auth_router
+from backend.app.routers.student import router as student_router
+from backend.app.routers.driver import router as driver_router
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="University Bus Tracking API")
@@ -45,3 +47,5 @@ def database_test():
 
 app.include_router(user_router)
 app.include_router(auth_router)
+app.include_router(student_router)
+app.include_router(driver_router)

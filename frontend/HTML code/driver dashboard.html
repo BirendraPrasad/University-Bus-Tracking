@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Driver Dashboard | University Bus Tracking</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="../CSS/driver dashboard.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></symbol>
+  <symbol id="i-bus" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="15" rx="2"/><path d="M4 11h16M8 21v-3M16 21v-3"/><circle cx="8" cy="14.5" r=".6"/><circle cx="16" cy="14.5" r=".6"/></symbol>
+  <symbol id="i-route" viewBox="0 0 24 24"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h8a3 3 0 0 0 0-6H8a3 3 0 0 1 0-6h8"/></symbol>
+  <symbol id="i-flag" viewBox="0 0 24 24"><path d="M4 22V4M4 4h13l-2 4 2 4H4"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 22s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M10 21a2 2 0 0 0 4 0"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></symbol>
+  <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></symbol>
+</svg>
+
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<aside class="sidebar" id="sidebar" aria-label="Driver navigation">
+  <div class="sidebar-brand">
+    <img src="../photo/chanakya-university.svg" alt="" class="brand-logo">
+    <div><strong>University Bus</strong><span>Tracking</span></div>
+  </div>
+  <nav class="sidebar-menu">
+    <a href="#" class="menu-item active" data-page="dashboard"><svg class="ic"><use href="#i-home"/></svg>Dashboard</a>
+    <a href="#" class="menu-item" data-page="bus"><svg class="ic"><use href="#i-bus"/></svg>My Bus</a>
+    <a href="#" class="menu-item" data-page="route"><svg class="ic"><use href="#i-route"/></svg>My Route</a>
+    <a href="#" class="menu-item" data-page="trip"><svg class="ic"><use href="#i-flag"/></svg>Current Trip</a>
+    <a href="#" class="menu-item" data-page="gps"><svg class="ic"><use href="#i-pin"/></svg>GPS Tracking</a>
+    <a href="#" class="menu-item" data-page="history"><svg class="ic"><use href="#i-clock"/></svg>Trip History</a>
+    <a href="#" class="menu-item" data-page="notifications"><svg class="ic"><use href="#i-bell"/></svg>Notifications</a>
+    <a href="#" class="menu-item" data-page="profile"><svg class="ic"><use href="#i-user"/></svg>My Profile</a>
+    <a href="#" class="menu-item" data-page="settings"><svg class="ic"><use href="#i-gear"/></svg>Settings</a>
+  </nav>
+  <button class="menu-item logout-side" id="logoutSide" type="button"><svg class="ic"><use href="#i-logout"/></svg>Logout</button>
+</aside>
+
+<div class="main-area">
+  <header class="top-header">
+    <button class="icon-btn mobile-menu-btn" id="mobileMenuBtn" type="button" aria-label="Open menu" aria-expanded="false"><svg class="ic"><use href="#i-menu"/></svg></button>
+    <div class="header-title"><span class="brand-name">University Bus Tracking</span><h1 id="pageTitle">Driver Dashboard</h1></div>
+    <div class="header-right">
+      <button class="icon-btn" id="notifBtn" type="button" aria-label="Notifications"><svg class="ic"><use href="#i-bell"/></svg><span class="dot" id="notifDot" hidden></span></button>
+      <button class="profile-mini" id="profileBtn" type="button" aria-label="Open profile">
+        <span class="avatar" id="hdrAvatar">–</span>
+        <span class="profile-text"><strong id="hdrName">Loading…</strong><em class="role-badge" id="hdrRole">–</em></span>
+      </button>
+      <button class="icon-btn logout-top" id="logoutTop" type="button" aria-label="Logout"><svg class="ic"><use href="#i-logout"/></svg></button>
+    </div>
+  </header>
+
+  <div class="banner" id="pageBanner" hidden></div>
+
+  <!-- Shown when the backend refuses the token (e.g. a student opened this page) -->
+  <section class="denied" id="deniedPanel" hidden>
+    <h2>Access denied</h2>
+    <p>This dashboard is only for driver accounts.</p>
+    <a class="btn primary" href="login.html">Back to login</a>
+    <a class="btn outline" href="student dashboard.html">Student dashboard</a>
+  </section>
+
+  <main class="content" id="appContent" hidden>
+
+    <section id="dashboardSection" class="page-section active">
+      <div class="cards-grid">
+        <div class="card stat"><span class="label">Assigned Bus</span><strong id="cBusNumber">—</strong><small id="cBusMeta">—</small></div>
+        <div class="card stat"><span class="label">Assigned Route</span><strong id="cRouteCode">—</strong><small id="cRouteName">—</small><small id="cRoutePoints"></small></div>
+        <div class="card stat"><span class="label">Trip Status</span><strong id="cTripStatus">—</strong><small id="cTripSub">—</small></div>
+        <div class="card stat"><span class="label">GPS Status</span><strong id="cGpsStatus">GPS Not Started</strong><small id="cGpsSub">—</small></div>
+        <div class="card stat"><span class="label">Next Stop</span><strong id="cNextStop">—</strong><small id="cNextSub">—</small></div>
+        <div class="card stat"><span class="label">Trip Progress</span><strong id="cProgress">—</strong><small id="cProgressSub">—</small></div>
+      </div>
+    </section>
+
+    <section id="busSection" class="page-section">
+      <div class="card"><h2>My Bus</h2><div id="busDetails"></div></div>
+    </section>
+
+    <section id="routeSection" class="page-section">
+      <div class="card"><h2>My Route</h2><div id="routeInfo"></div></div>
+      <div class="card"><h2>Route Map</h2><div id="routeMap" class="map"></div><p class="note" id="mapNote"></p></div>
+      <div class="card"><h2>Stops</h2><div id="stopsList"></div></div>
+    </section>
+
+    <section id="tripSection" class="page-section">
+      <div class="card">
+        <div class="card-head"><h2>Current Trip</h2><span class="badge" id="tripBadge">—</span></div>
+        <div id="tripDetails"></div>
+        <div class="trip-actions">
+          <button class="btn big primary" id="startTripBtn" type="button" disabled>START TRIP</button>
+          <button class="btn big danger" id="endTripBtn" type="button" disabled>END TRIP</button>
+        </div>
+        <p class="note" id="tripMsg"></p>
+      </div>
+    </section>
+
+    <section id="gpsSection" class="page-section">
+      <div class="card">
+        <div class="card-head"><h2>GPS Tracking</h2><span class="badge" id="gpsBadge">Not Started</span></div>
+        <div class="gps-grid">
+          <div><span class="label">Latitude</span><strong id="gpsLat">—</strong></div>
+          <div><span class="label">Longitude</span><strong id="gpsLng">—</strong></div>
+          <div><span class="label">Last updated</span><strong id="gpsUpdated">—</strong></div>
+        </div>
+        <div class="trip-actions">
+          <button class="btn big primary" id="startGpsBtn" type="button">START GPS SHARING</button>
+          <button class="btn big outline" id="stopGpsBtn" type="button" disabled>STOP GPS SHARING</button>
+        </div>
+        <p class="note" id="gpsNote"></p>
+      </div>
+    </section>
+
+    <section id="historySection" class="page-section">
+      <div class="card">
+        <h2>Trip History</h2>
+        <div class="table-scroll">
+          <table class="data-table">
+            <thead><tr><th>Trip ID</th><th>Date</th><th>Bus</th><th>Route</th><th>Start</th><th>End</th><th>Status</th></tr></thead>
+            <tbody id="historyBody"></tbody>
+          </table>
+        </div>
+        <div class="empty" id="historyEmpty" hidden></div>
+      </div>
+    </section>
+
+    <section id="notificationsSection" class="page-section">
+      <div class="card"><h2>Notifications</h2><div id="notifList"></div></div>
+    </section>
+
+    <section id="profileSection" class="page-section">
+      <div class="card"><h2>My Profile</h2><div id="profileInfo"></div></div>
+    </section>
+
+    <section id="settingsSection" class="page-section">
+      <div class="card"><h2>Account</h2><div id="setInfo"></div></div>
+      <div class="card"><h2>GPS permission</h2><p id="setGpsPerm" class="note"></p></div>
+      <div class="card"><h2>Notifications</h2><p class="note">Notification preferences cannot be changed yet. Messages from transport administration appear under Notifications.</p></div>
+      <div class="card"><button class="btn outline" id="logoutSettings" type="button">Logout</button></div>
+    </section>
+
+  </main>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="../JavaScript/driver dashboard.js"></script>
+</body>
+</html>

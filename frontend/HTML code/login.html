@@ -6,41 +6,57 @@
     <title>Login — Chanakya University | Real-Time Bus Tracking</title>
     <meta name="description" content="Sign in to the Chanakya University Real-Time University Bus Tracking System." />
 
-    <!-- Fonts: Archivo (headings) + Inter (body) -->
+    <!-- Fonts: same as landing page (Archivo + Inter) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-    <!-- Single stylesheet -->
     <link rel="stylesheet" href="../CSS/login.css" />
 </head>
 <body>
 
-    <main class="login-shell" role="main">
+    <!-- CSS-only mobile menu toggle (no JavaScript needed) -->
+    <input type="checkbox" id="navCheck" class="nav-check" aria-label="Toggle navigation menu" />
 
-        <!-- ================= LEFT : BRANDING PANEL ================= -->
-        <section class="brand-panel" aria-label="Chanakya University branding">
-            <div class="brand-decor" aria-hidden="true"></div>
+    <!-- ================= NAVBAR (same pattern as landing page) ================= -->
+    <header class="navbar">
+        <div class="navbar__inner container">
+            <a href="landing page.html" class="navbar__brand" aria-label="Chanakya University home">
+                <img src="../photo/chanakya-university.svg" alt="Chanakya University" class="navbar__logo" />
+            </a>
 
-            <header class="brand-header">
-                <img
-                    src="../photo/chanakya-university.svg"
-                    alt="Chanakya University"
-                    class="brand-logo"
-                />
-            </header>
+            <nav class="navbar__links" aria-label="Primary">
+                <a href="landing page.html#home" class="navbar__link">Home</a>
+                <a href="landing page.html#features" class="navbar__link">Features</a>
+                <a href="landing page.html#how-it-works" class="navbar__link">How It Works</a>
+                <a href="landing page.html#about" class="navbar__link">About</a>
+            </nav>
 
-            <div class="brand-body">
-                <p class="brand-tagline">
+            <div class="navbar__actions">
+                <a href="login.html" class="btn-nav is-current" aria-current="page">Login</a>
+                <label for="navCheck" class="navbar__toggle" aria-hidden="true">
+                    <span></span><span></span><span></span>
+                </label>
+            </div>
+        </div>
+    </header>
+
+    <!-- ================= HERO + LOGIN ================= -->
+    <main class="hero" role="main">
+        <div class="hero__inner container">
+
+            <!-- LEFT : BRANDING -->
+            <section class="hero__copy" aria-label="Chanakya University bus tracking">
+                <p class="hero__kicker">
                     Smart Campus <span class="dot">•</span> Safe Journey <span class="dot">•</span> Connected University
                 </p>
 
-                <h1 class="brand-title">
+                <h1 class="hero__title">
                     Real-Time University<br />
                     <span class="accent">Bus Tracking</span>
                 </h1>
 
-                <p class="brand-desc">
+                <p class="hero__desc">
                     Track university buses in real time, check routes and estimated
                     arrival times, and stay connected with campus transportation.
                 </p>
@@ -48,7 +64,6 @@
                 <div class="service-grid">
                     <article class="service-card">
                         <div class="service-icon" aria-hidden="true">
-                            <!-- Route bus icon -->
                             <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
                                  stroke="currentColor" stroke-width="1.8"
                                  stroke-linecap="round" stroke-linejoin="round">
@@ -67,7 +82,6 @@
 
                     <article class="service-card">
                         <div class="service-icon" aria-hidden="true">
-                            <!-- Shuttle icon -->
                             <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
                                  stroke="currentColor" stroke-width="1.8"
                                  stroke-linecap="round" stroke-linejoin="round">
@@ -83,26 +97,10 @@
                         </div>
                     </article>
                 </div>
-            </div>
+            </section>
 
-            <footer class="brand-footer">
-                <span>© <span id="brandYear"></span> Chanakya University</span>
-            </footer>
-        </section>
-
-        <!-- ================= RIGHT : LOGIN CARD ================= -->
-        <section class="form-panel" aria-label="Login form">
-            <div class="form-inner">
-
-                <a href="landing page.html" class="back-link" aria-label="Back to Home">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none"
-                         stroke="currentColor" stroke-width="2"
-                         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="M15 18l-6-6 6-6"/>
-                    </svg>
-                    <span>Back to Home</span>
-                </a>
-
+            <!-- RIGHT : LOGIN CARD -->
+            <section class="form-panel" aria-label="Login form">
                 <div class="login-card" role="form" aria-labelledby="loginHeading">
 
                     <div class="card-icon" aria-hidden="true">
@@ -184,11 +182,7 @@
                                 <span>Remember me</span>
                             </label>
 
-                            <button
-                                type="button"
-                                id="forgotLink"
-                                class="link-btn"
-                            >Forgot Password?</button>
+                            <button type="button" id="forgotLink" class="link-btn">Forgot Password?</button>
                         </div>
 
                         <!-- SUBMIT -->
@@ -197,7 +191,7 @@
                             <span class="btn-spinner" aria-hidden="true"></span>
                         </button>
 
-                        <!-- INLINE MESSAGE -->
+                        <!-- INLINE MESSAGE (written to by login.js) -->
                         <div
                             id="formMessage"
                             class="form-message"
@@ -206,28 +200,28 @@
                         ></div>
                     </form>
 
-                    <!-- ROLES INFO -->
-                    <!-- ROLES INFO -->
-                <!-- <p class="roles-info">
-                    <span>Student</span>
-                    <span class="dot">•</span>
-                    <span>Driver</span>
-                    <span class="dot">•</span>
-                    <span>Faculty</span>
-                    <span class="dot">•</span>
-                    <span>Admin</span>
-                </p> -->
-
-                <!-- REGISTER LINK -->
-                <p class="register-link">
-                    Don't have an account?
-                    <a href="register.html">Register</a>
-                </p>
+                    <p class="register-link">
+                        Don't have an account?
+                        <a href="register.html">Register</a>
+                    </p>
                 </div>
-            </div>
-        </section>
 
+                <a href="landing page.html" class="back-link">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none"
+                         stroke="currentColor" stroke-width="2"
+                         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M19 12H5M12 19l-7-7 7-7"/>
+                    </svg>
+                    <span>Back to Home</span>
+                </a>
+            </section>
+
+        </div>
     </main>
+
+    <footer class="page-foot">
+        <span>© <span id="brandYear"></span> Chanakya University</span>
+    </footer>
 
     <script src="../JavaScript/login.js"></script>
 </body>

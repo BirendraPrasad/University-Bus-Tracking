@@ -341,6 +341,10 @@ document.addEventListener("DOMContentLoaded", function () {
             const target =
                 rolePages[role];
 
+            console.log("LOGIN DATA:", data);
+            console.log("ROLE:", role);
+            console.log("TARGET:", target);    
+
 
             if (!target) {
 

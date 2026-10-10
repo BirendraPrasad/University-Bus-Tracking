@@ -1,1193 +1,547 @@
 /* =========================================================
-   CHANAKYA UNIVERSITY
-   REAL-TIME UNIVERSITY BUS TRACKING
-   LOGIN PAGE — PROFESSIONAL UI
+   CHANAKYA UNIVERSITY — REAL-TIME BUS TRACKING
+   LOGIN PAGE (visual continuation of the landing page)
    ========================================================= */
 
 :root {
-    --navy: #061a38;
-    --navy-2: #092d60;
-    --navy-3: #1058a8;
+    --navy:       #062B63;
+    --navy-2:     #0B3A78;
+    --navy-deep:  #04204a;
 
-    --blue: #246bdd;
-    --blue-dark: #1557bd;
-    --blue-soft: #edf4ff;
+    --gold:       #F5A623;
+    --gold-light: #FFB52E;
+    --gold-dark:  #D98E1F;
 
-    --gold: #f5b83d;
-    --gold-light: #ffc95c;
+    --white:      #FFFFFF;
+    --bg-light:   #F5F8FC;
+    --paper:      #F7F5F0;     /* landing navbar tint */
 
-    --white: #ffffff;
-    --text: #10233f;
-    --text-light: #65758b;
-    --muted: #8b99aa;
+    --ink:        #10233f;
+    --slate:      #55606B;
+    --muted:      #8A929B;
+    --border:     #dce4ef;
+    --error:      #c2362f;
+    --success:    #1c7a4d;
 
-    --border: #dce4ef;
+    --font-display: "Archivo", "Segoe UI", Arial, sans-serif;
+    --font-body:    "Inter", "Segoe UI", Arial, sans-serif;
+    --transition:   0.22s cubic-bezier(0.4, 0, 0.2, 1);
+    --nav-h:        72px;
 }
 
-/* =========================================================
-   RESET
-   ========================================================= */
-
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-
-html {
-    width: 100%;
-    min-height: 100%;
-}
-
+/* ---------- Reset ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
 body {
-    width: 100%;
+    margin: 0;
     min-height: 100vh;
-
-    font-family: "Inter", Arial, sans-serif;
-
-    background: var(--navy);
-    color: var(--text);
-
-    overflow-x: hidden;
-}
-
-button,
-input {
-    font-family: inherit;
-}
-
-button {
-    cursor: pointer;
-}
-
-
-/* =========================================================
-   MAIN SHELL
-   ========================================================= */
-
-.login-shell {
-    position: relative;
-
-    width: 100%;
-    min-height: 100vh;
-
-    overflow: hidden;
-}
-
-
-/* =========================================================
-   FULL BLUE BACKGROUND
-   ========================================================= */
-
-.brand-panel {
-    position: absolute;
-
-    inset: 0;
-
-    width: 100%;
-    min-height: 100vh;
-
-    padding: 34px 50px;
-
     display: flex;
     flex-direction: column;
+    font-family: var(--font-body);
+    color: var(--ink);
+    background: var(--navy-deep);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+}
+h1, h2, h3, p { margin: 0; }
+h1, h2, h3 { font-family: var(--font-display); line-height: 1.15; }
+a { color: inherit; text-decoration: none; }
+img, svg { display: block; max-width: 100%; }
+button, input { font-family: inherit; }
+button { cursor: pointer; }
 
-    color: #fff;
-
-    overflow: hidden;
-
-    background:
-        radial-gradient(
-            circle at 90% 85%,
-            rgba(48, 125, 229, 0.28),
-            transparent 30%
-        ),
-        radial-gradient(
-            circle at 10% 15%,
-            rgba(50, 117, 221, 0.22),
-            transparent 30%
-        ),
-        linear-gradient(
-            135deg,
-            #061a38 0%,
-            #092d60 50%,
-            #1058a8 100%
-        );
+:focus-visible {
+    outline: 2.5px solid var(--gold-dark);
+    outline-offset: 2px;
+    border-radius: 3px;
 }
 
-
-/* =========================================================
-   BACKGROUND DOTS
-   ========================================================= */
-
-.brand-decor {
-    position: absolute;
-
-    inset: 0;
-
-    pointer-events: none;
-
-    background-image:
-        radial-gradient(
-            rgba(255,255,255,0.10) 1px,
-            transparent 1px
-        );
-
-    background-size: 25px 25px;
-
-    opacity: .28;
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
 }
 
+.container {
+    width: 100%;
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0 28px;
+}
 
 /* =========================================================
-   DECORATIVE CIRCLES
+   NAVBAR
    ========================================================= */
-
-.brand-panel::before {
-    content: "";
-
+.nav-check {
     position: absolute;
-
-    width: 700px;
-    height: 700px;
-
-    right: -350px;
-    bottom: -330px;
-
-    border-radius: 50%;
-
-    border: 90px solid rgba(255,255,255,.035);
-
+    opacity: 0;
+    width: 1px;
+    height: 1px;
     pointer-events: none;
 }
 
-.brand-panel::after {
-    content: "";
-
-    position: absolute;
-
-    width: 500px;
-    height: 500px;
-
-    right: -250px;
-    bottom: -220px;
-
-    border-radius: 50%;
-
-    border: 1px solid rgba(255,255,255,.07);
-
-    pointer-events: none;
+.navbar {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(247, 245, 240, 0.92);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+    border-bottom: 1px solid rgba(227, 223, 213, 0.7);
+    box-shadow: 0 4px 24px -10px rgba(6, 43, 99, 0.25);
 }
 
-
-/* =========================================================
-   UNIVERSITY LOGO
-   ========================================================= */
-
-.brand-header {
-    position: relative;
-
-    z-index: 5;
-
+.navbar__inner {
     display: flex;
     align-items: center;
+    justify-content: space-between;
+    height: var(--nav-h);
 }
 
-.brand-logo {
-    width: 250px;
-    height: 65px;
-
-    display: block;
-
+.navbar__brand { display: flex; align-items: center; height: 52px; width: 245px; }
+.navbar__logo {
+    width: 100%;
+    height: 100%;
     object-fit: contain;
     object-position: left center;
-
-    /*
-       Original logo has dark blue text.
-       Convert it to white so it is clearly
-       visible on the blue background.
-    */
-    filter:
-        brightness(0)
-        invert(1);
-
-    opacity: 1;
 }
 
-
-/* =========================================================
-   LEFT BRAND CONTENT
-   ========================================================= */
-
-.brand-body {
+.navbar__links { display: flex; align-items: center; gap: 34px; }
+.navbar__link {
     position: relative;
-
-    z-index: 5;
-
-    width: 48%;
-    max-width: 610px;
-
-    margin: auto 0;
+    padding: 6px 4px;
+    font-size: 0.94rem;
+    font-weight: 500;
+    color: var(--slate);
+    transition: color var(--transition);
 }
-
-
-/* =========================================================
-   TAGLINE
-   ========================================================= */
-
-.brand-tagline {
-    margin-bottom: 18px;
-
-    color: rgba(255,255,255,.78);
-
-    font-size: 11px;
-    font-weight: 800;
-
-    letter-spacing: 1.8px;
-
-    text-transform: uppercase;
-}
-
-.brand-tagline .dot {
-    margin: 0 8px;
-
-    color: var(--gold);
-}
-
-
-/* =========================================================
-   TITLE
-   ========================================================= */
-
-.brand-title {
-    margin-bottom: 19px;
-
-    font-family: "Archivo", sans-serif;
-
-    font-size: clamp(42px, 5vw, 68px);
-
-    line-height: 1.02;
-
-    letter-spacing: -2.5px;
-
-    color: #fff;
-}
-
-.brand-title .accent {
-    color: var(--gold-light);
-}
-
-
-/* =========================================================
-   DESCRIPTION
-   ========================================================= */
-
-.brand-desc {
-    max-width: 570px;
-
-    margin-bottom: 30px;
-
-    color: rgba(255,255,255,.72);
-
-    font-size: 14px;
-
-    line-height: 1.75;
-}
-
-
-/* =========================================================
-   SERVICE CARDS
-   ========================================================= */
-
-.service-grid {
-    display: flex;
-
-    gap: 12px;
-
-    max-width: 450px;
-}
-
-.service-card {
-    min-width: 185px;
-
-    padding: 13px 15px;
-
-    display: flex;
-    align-items: center;
-
-    gap: 12px;
-
-    border: 1px solid rgba(255,255,255,.14);
-
-    border-radius: 12px;
-
-    background: rgba(255,255,255,.07);
-
-    backdrop-filter: blur(10px);
-
-    transition: .2s;
-}
-
-.service-card:hover {
-    transform: translateY(-2px);
-
-    background: rgba(255,255,255,.10);
-
-    border-color: rgba(255,255,255,.20);
-}
-
-.service-icon {
-    width: 39px;
-    height: 39px;
-
-    flex-shrink: 0;
-
-    display: grid;
-    place-items: center;
-
-    border-radius: 10px;
-
-    background:
-        linear-gradient(
-            145deg,
-            #2d76e4,
-            #1557bd
-        );
-
-    color: #fff;
-
-    font-size: 18px;
-
-    box-shadow:
-        0 7px 15px rgba(0,0,0,.15);
-}
-
-.service-text h3 {
-    margin-bottom: 3px;
-
-    color: #fff;
-
-    font-size: 11px;
-    font-weight: 800;
-}
-
-.service-text p {
-    color: rgba(255,255,255,.55);
-
-    font-size: 9px;
-}
-
-
-/* =========================================================
-   FOOTER
-   ========================================================= */
-
-.brand-footer {
-    position: relative;
-
-    z-index: 5;
-
-    color: rgba(255,255,255,.48);
-
-    font-size: 10px;
-}
-
-
-/* =========================================================
-   RIGHT FORM PANEL
-   ========================================================= */
-
-.form-panel {
+.navbar__link::after {
+    content: "";
     position: absolute;
+    left: 0; right: 0; bottom: -2px;
+    height: 2.5px;
+    border-radius: 2px;
+    background: var(--gold);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform var(--transition);
+}
+.navbar__link:hover { color: var(--navy); }
+.navbar__link:hover::after { transform: scaleX(0.5); }
 
-    top: 0;
-    right: 0;
+.navbar__actions { display: flex; align-items: center; gap: 14px; }
 
-    width: 46%;
-    height: 100vh;
-
-    z-index: 20;
-
-    display: flex;
-
+/* Login item — gold button, ringed to show "you are here" */
+.btn-nav {
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-
-    padding: 30px 50px;
-
-    background: transparent;
-
-    overflow-y: auto;
-
-    pointer-events: none;
+    padding: 9px 20px;
+    border-radius: 6px;
+    font-size: 0.86rem;
+    font-weight: 600;
+    color: var(--navy);
+    background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dark) 100%);
+    box-shadow: 0 2px 12px -3px rgba(245, 166, 35, 0.45);
+    transition: transform var(--transition), box-shadow var(--transition);
+}
+.btn-nav:hover { transform: translateY(-2px); }
+.btn-nav.is-current {
+    box-shadow: 0 0 0 3px rgba(245, 166, 35, 0.30), 0 2px 12px -3px rgba(245, 166, 35, 0.45);
 }
 
-
-/* =========================================================
-   FORM INNER
-   ========================================================= */
-
-.form-inner {
-    width: 100%;
-
-    max-width: 455px;
-
-    pointer-events: auto;
+/* Hamburger (label for #navCheck) */
+.navbar__toggle {
+    display: none;
+    width: 38px;
+    height: 34px;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+    cursor: pointer;
+}
+.navbar__toggle span {
+    display: block;
+    height: 2px;
+    background: var(--navy);
+    border-radius: 2px;
+    transition: transform 0.22s ease, opacity 0.22s ease;
+}
+.nav-check:checked ~ .navbar .navbar__toggle span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.nav-check:checked ~ .navbar .navbar__toggle span:nth-child(2) { opacity: 0; }
+.nav-check:checked ~ .navbar .navbar__toggle span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+.nav-check:focus-visible ~ .navbar .navbar__toggle {
+    outline: 2.5px solid var(--gold-dark);
+    outline-offset: 2px;
 }
 
-
 /* =========================================================
-   BACK TO HOME
+   HERO (campus photo + navy overlay)
    ========================================================= */
-
-.back-link {
-    display: inline-flex;
-
+.hero {
+    position: relative;
+    flex: 1 0 auto;
+    display: flex;
     align-items: center;
-
-    gap: 6px;
-
-    margin-bottom: 12px;
-
-    padding: 7px 11px;
-
-    border-radius: 20px;
-
-    color: rgba(255,255,255,.90);
-
-    background: rgba(255,255,255,.08);
-
-    border: 1px solid rgba(255,255,255,.08);
-
-    backdrop-filter: blur(10px);
-
-    text-decoration: none;
-
-    font-size: 11px;
-    font-weight: 700;
-
-    transition: .2s;
-}
-
-.back-link:hover {
-    background: rgba(255,255,255,.15);
-
-    transform: translateX(-2px);
-}
-
-
-/* =========================================================
-   LOGIN CARD
-   ========================================================= */
-
-.login-card {
-    width: 100%;
-
-    padding: 30px 34px 25px;
-
-    border-radius: 21px;
-
     background:
-        linear-gradient(
-            180deg,
-            rgba(255,255,255,.99),
-            rgba(249,251,255,.98)
-        );
-
-    border: 1px solid rgba(255,255,255,.75);
-
-    box-shadow:
-        0 30px 70px rgba(0,0,0,.28),
-        0 10px 25px rgba(0,0,0,.10);
-
-    backdrop-filter: blur(20px);
+        linear-gradient(105deg,
+            rgba(6, 43, 99, 0.95) 0%,
+            rgba(11, 58, 120, 0.84) 52%,
+            rgba(6, 43, 99, 0.72) 100%),
+        url("../photo/campus%20photo.jpg") center 30% / cover no-repeat,
+        var(--navy);
+    overflow: hidden;
 }
 
+.hero__inner {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 440px);
+    align-items: center;
+    gap: 64px;
+    padding-top: 56px;
+    padding-bottom: 56px;
+}
 
-/* =========================================================
-   LOGIN ICON
-   ========================================================= */
+/* ---------- Left copy ---------- */
+.hero__copy { max-width: 600px; animation: fadeUp 0.7s cubic-bezier(0.22, 1, 0.36, 1) both; }
+@keyframes fadeUp {
+    from { opacity: 0; transform: translateY(24px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
 
-.card-icon {
-    width: 52px;
-    height: 52px;
+.hero__kicker {
+    display: inline-block;
+    margin-bottom: 22px;
+    padding: 6px 14px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--gold-light);
+    background: rgba(245, 166, 35, 0.14);
+    border: 1px solid rgba(245, 166, 35, 0.32);
+    border-radius: 99px;
+}
+.hero__kicker .dot { margin: 0 6px; opacity: 0.8; }
 
-    margin-bottom: 15px;
+.hero__title {
+    margin-bottom: 20px;
+    font-size: clamp(2.3rem, 4.6vw, 3.8rem);
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    color: var(--white);
+    text-shadow: 0 2px 20px rgba(0, 0, 0, 0.3);
+}
+.hero__title .accent { color: var(--gold-light); }
 
+.hero__desc {
+    max-width: 52ch;
+    margin-bottom: 32px;
+    font-size: 1.04rem;
+    line-height: 1.65;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.service-grid { display: flex; flex-wrap: wrap; gap: 14px; }
+.service-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 215px;
+    padding: 14px 18px;
+    background: rgba(255, 255, 255, 0.09);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 14px;
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    transition: transform var(--transition), background var(--transition), border-color var(--transition);
+}
+.service-card:hover {
+    transform: translateY(-2px);
+    background: rgba(255, 255, 255, 0.14);
+    border-color: rgba(245, 166, 35, 0.55);
+}
+.service-icon {
+    flex-shrink: 0;
     display: grid;
     place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    color: var(--navy);
+    background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dark) 100%);
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.18);
+}
+.service-text h3 { font-size: 0.98rem; font-weight: 700; color: var(--white); margin-bottom: 2px; }
+.service-text p  { font-size: 0.82rem; color: rgba(255, 255, 255, 0.68); }
 
+/* ---------- Right: form panel ---------- */
+.form-panel {
+    width: 100%;
+    animation: fadeUp 0.7s 0.12s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.login-card {
+    padding: 34px 36px 28px;
+    background: var(--white);
+    border-radius: 22px;
+    border-top: 4px solid var(--gold);
+    box-shadow: 0 30px 70px -10px rgba(0, 0, 0, 0.45), 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.card-icon {
+    display: grid;
+    place-items: center;
+    width: 52px;
+    height: 52px;
+    margin-bottom: 16px;
     border-radius: 15px;
-
-    background:
-        linear-gradient(
-            145deg,
-            #2e73df,
-            #1557bd
-        );
-
-    color: #fff;
-
-    font-size: 22px;
-
-    box-shadow:
-        0 10px 23px rgba(23,105,209,.24);
+    color: var(--white);
+    background: linear-gradient(145deg, var(--navy-2), var(--navy));
+    box-shadow: 0 10px 22px rgba(6, 43, 99, 0.28);
 }
 
+.card-title { font-size: 1.75rem; font-weight: 800; letter-spacing: -0.02em; color: var(--navy); margin-bottom: 4px; }
+.card-sub   { font-size: 0.98rem; font-weight: 600; color: #334963; margin-bottom: 4px; }
+.card-help  { font-size: 0.86rem; color: var(--slate); margin-bottom: 24px; }
 
-/* =========================================================
-   CARD TEXT
-   ========================================================= */
-
-.card-title {
-    margin-bottom: 4px;
-
-    color: #0b1d38;
-
-    font-family: "Archivo", sans-serif;
-
-    font-size: 27px;
-
-    line-height: 1.2;
-}
-
-.card-sub {
-    margin-bottom: 4px;
-
-    color: #334963;
-
-    font-size: 13px;
-
-    font-weight: 600;
-}
-
-.card-help {
-    margin-bottom: 21px;
-
-    color: #718096;
-
-    font-size: 11px;
-
-    line-height: 1.5;
-}
-
-
-/* =========================================================
-   FORM FIELD
-   ========================================================= */
-
-.field {
-    margin-bottom: 15px;
-}
-
+/* ---------- Fields ---------- */
+.field { margin-bottom: 16px; }
 .field label {
     display: block;
-
     margin-bottom: 7px;
-
+    font-size: 0.82rem;
+    font-weight: 600;
     color: #30445d;
-
-    font-size: 11px;
-
-    font-weight: 800;
 }
-
-
-/* =========================================================
-   INPUT WRAPPER
-   ========================================================= */
 
 .input-wrap {
     position: relative;
-
-    width: 100%;
-
-    min-height: 48px;
-
     display: flex;
-
     align-items: center;
-
+    min-height: 50px;
+    background: var(--bg-light);
     border: 1px solid var(--border);
-
-    border-radius: 10px;
-
-    background: #fff;
-
-    transition:
-        border .2s ease,
-        box-shadow .2s ease;
+    border-radius: 11px;
+    transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
 }
-
-.input-wrap:hover {
-    border-color: #bccbe0;
-}
-
+.input-wrap:hover { border-color: #b7c6dc; }
 .input-wrap:focus-within {
-    border-color: var(--blue);
-
-    box-shadow:
-        0 0 0 4px rgba(36,107,221,.10);
+    background: var(--white);
+    border-color: var(--navy-2);
+    box-shadow: 0 0 0 4px rgba(11, 58, 120, 0.12);
 }
-
-
-/* =========================================================
-   INPUT ICON
-   ========================================================= */
 
 .input-icon {
     position: absolute;
-
     left: 14px;
-
     display: grid;
-
     place-items: center;
-
     color: #71839a;
-
     pointer-events: none;
-
-    font-size: 14px;
 }
-
-
-/* =========================================================
-   INPUT
-   ========================================================= */
+.input-wrap:focus-within .input-icon { color: var(--navy-2); }
 
 .input-wrap input {
     width: 100%;
-
-    height: 46px;
-
-    padding:
-        12px
-        48px
-        12px
-        42px;
-
+    height: 48px;
+    padding: 12px 56px 12px 44px;
     border: 0;
-
     outline: none;
-
     background: transparent;
-
-    color: #10233f;
-
-    font-size: 12px;
+    font-size: 0.94rem;
+    color: var(--ink);
 }
-
-.input-wrap input::placeholder {
-    color: #9aa8ba;
-}
-
-
-/* =========================================================
-   PASSWORD TOGGLE
-   ========================================================= */
+.input-wrap input::placeholder { color: #9aa8ba; }
 
 .toggle-password {
     position: absolute;
-
-    right: 7px;
-
-    padding: 7px 9px;
-
+    right: 6px;
+    padding: 8px 10px;
     border: 0;
-
-    border-radius: 7px;
-
+    border-radius: 8px;
     background: transparent;
-
-    color: var(--blue);
-
-    font-size: 10px;
-
-    font-weight: 800;
-
-    cursor: pointer;
-
-    transition: .2s;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--navy-2);
+    transition: background var(--transition);
 }
+.toggle-password:hover { background: rgba(11, 58, 120, 0.08); }
 
-.toggle-password:hover {
-    background: var(--blue-soft);
-}
-
-
-/* =========================================================
-   REMEMBER ME / FORGOT
-   ========================================================= */
-
+/* ---------- Remember / Forgot ---------- */
 .row-between {
     display: flex;
-
     align-items: center;
-
     justify-content: space-between;
-
+    flex-wrap: wrap;
     gap: 10px;
-
-    margin: 5px 0 18px;
+    margin: 4px 0 20px;
 }
-
 .checkbox {
-    display: flex;
-
+    display: inline-flex;
     align-items: center;
-
-    gap: 7px;
-
-    color: #637389;
-
-    font-size: 10px;
-
+    gap: 8px;
+    font-size: 0.84rem;
+    color: var(--slate);
     cursor: pointer;
 }
-
-.checkbox input {
-    width: 15px;
-    height: 15px;
-
-    accent-color: var(--blue);
-
-    cursor: pointer;
-}
+.checkbox input { width: 17px; height: 17px; accent-color: var(--navy-2); cursor: pointer; }
 
 .link-btn {
-    padding: 0;
-
+    padding: 4px 0;
     border: 0;
-
     background: transparent;
-
-    color: var(--blue);
-
-    font-size: 10px;
-
-    font-weight: 800;
-
-    cursor: pointer;
+    font-size: 0.84rem;
+    font-weight: 700;
+    color: var(--navy-2);
 }
+.link-btn:hover { text-decoration: underline; }
 
-.link-btn:hover {
-    text-decoration: underline;
-}
-
-
-/* =========================================================
-   LOGIN BUTTON
-   ========================================================= */
-
+/* ---------- Submit ---------- */
 .submit-btn {
-    width: 100%;
-
-    min-height: 48px;
-
     display: flex;
-
     align-items: center;
-
     justify-content: center;
-
-    gap: 9px;
-
+    gap: 10px;
+    width: 100%;
+    min-height: 50px;
     border: 0;
-
-    border-radius: 10px;
-
-    background:
-        linear-gradient(
-            135deg,
-            #2e73df,
-            #1557bd
-        );
-
-    color: #fff;
-
-    font-size: 12px;
-
-    font-weight: 800;
-
-    box-shadow:
-        0 12px 25px rgba(23,105,209,.24);
-
-    transition:
-        transform .2s ease,
-        box-shadow .2s ease,
-        opacity .2s ease;
+    border-radius: 11px;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--navy);
+    background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dark) 100%);
+    box-shadow: 0 8px 22px -6px rgba(217, 142, 31, 0.6);
+    transition: transform var(--transition), box-shadow var(--transition), opacity var(--transition);
 }
+.submit-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 28px -6px rgba(217, 142, 31, 0.7); }
+.submit-btn:active { transform: translateY(1px); }
+.submit-btn:disabled { opacity: 0.75; cursor: wait; transform: none; }
 
-.submit-btn:hover {
-    transform: translateY(-1px);
-
-    box-shadow:
-        0 16px 30px rgba(23,105,209,.30);
+/* Spinner appears automatically while login.js disables the button */
+.btn-spinner {
+    display: none;
+    width: 16px;
+    height: 16px;
+    border: 2.5px solid rgba(6, 43, 99, 0.25);
+    border-top-color: var(--navy);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
 }
+.submit-btn:disabled .btn-spinner { display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
-.submit-btn:active {
-    transform: translateY(0);
-}
+/* ---------- Message (classes set by login.js: is-visible + error/success/info) ---------- */
+.form-message { margin-top: 14px; font-size: 0.86rem; font-weight: 600; line-height: 1.4; text-align: center; }
+.form-message:empty,
+.form-message[hidden] { display: none; }
+.form-message.is-visible { padding: 10px 12px; border-radius: 9px; border: 1px solid transparent; }
+.form-message.error   { color: var(--error);   background: #fdecea; border-color: #f5c6c2; }
+.form-message.success { color: var(--success); background: #e8f6ee; border-color: #bfe3cf; }
+.form-message.info    { color: var(--navy-2);  background: #eaf1fb; border-color: #c6d8f1; }
 
-.submit-btn:disabled {
-    opacity: .65;
+/* ---------- Register + back ---------- */
+.register-link { margin-top: 20px; font-size: 0.88rem; text-align: center; color: var(--slate); }
+.register-link a { margin-left: 4px; font-weight: 700; color: var(--navy-2); }
+.register-link a:hover { text-decoration: underline; }
 
-    cursor: wait;
-
-    transform: none;
-}
-
-
-/* =========================================================
-   FORM MESSAGE
-   ========================================================= */
-
-.form-message {
-    min-height: 18px;
-
-    margin-top: 8px;
-
-    color: #d64b4b;
-
-    font-size: 10px;
-
+.back-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: fit-content;
+    margin: 20px auto 0;
+    padding: 9px 18px;
+    font-size: 0.88rem;
     font-weight: 600;
-
-    line-height: 1.4;
-
-    text-align: center;
+    color: rgba(255, 255, 255, 0.92);
+    background: rgba(255, 255, 255, 0.10);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 99px;
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    transition: background var(--transition), transform var(--transition);
 }
+.back-link:hover { background: rgba(255, 255, 255, 0.2); transform: translateX(-2px); }
 
+/* ---------- Footer ---------- */
+.page-foot {
+    padding: 16px 28px;
+    text-align: center;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.55);
+    background: #031636;
+    border-top: 3px solid var(--gold);
+}
 
 /* =========================================================
-   REGISTER LINK
+   RESPONSIVE
    ========================================================= */
 
-.register-link {
-    margin-top: 17px;
-
-    color: #7b899a;
-
-    font-size: 10px;
-
-    text-align: center;
-}
-
-.register-link a {
-    margin-left: 4px;
-
-    color: var(--blue);
-
-    font-weight: 800;
-
-    text-decoration: none;
-}
-
-.register-link a:hover {
-    text-decoration: underline;
-}
-
-
-/* =========================================================
-   TABLET
-   ========================================================= */
-
+/* Tablet */
 @media (max-width: 1050px) {
-
-    .brand-panel {
-        padding-left: 35px;
-        padding-right: 35px;
-    }
-
-    .form-panel {
-        width: 48%;
-
-        padding-left: 25px;
-        padding-right: 25px;
-    }
-
-    .brand-body {
-        width: 50%;
-    }
-
-    .brand-title {
-        font-size: 48px;
-    }
-
-    .brand-desc {
-        font-size: 12px;
-    }
-
-    .service-card {
-        min-width: 165px;
-    }
-
-    .brand-logo {
-        width: 220px;
-    }
+    .hero__inner { gap: 36px; grid-template-columns: minmax(0, 1fr) minmax(0, 400px); }
+    .login-card { padding: 30px 28px 24px; }
+    .navbar__links { gap: 22px; }
+    .navbar__brand { width: 210px; }
 }
 
+/* Stack: single column + collapsed nav */
+@media (max-width: 860px) {
+    .hero__inner { grid-template-columns: minmax(0, 1fr); gap: 32px; padding-top: 36px; padding-bottom: 44px; }
+    .hero__copy { max-width: 560px; margin: 0 auto; text-align: center; }
+    .hero__desc { margin-left: auto; margin-right: auto; }
+    .service-grid { justify-content: center; }
+    .form-panel { max-width: 460px; margin: 0 auto; }
 
-/* =========================================================
-   MOBILE
-   ========================================================= */
-
-@media (max-width: 760px) {
-
-    body {
-        overflow-y: auto;
-    }
-
-    .login-shell {
-        min-height: 100vh;
-    }
-
-    .brand-panel {
-        position: relative;
-
-        min-height: 100vh;
-
-        padding: 25px 20px 30px;
-
-        display: flex;
-
-        flex-direction: column;
-
-        justify-content: flex-start;
-    }
-
-    .brand-logo {
-        width: 190px;
-        height: auto;
-    }
-
-    .brand-body {
-        width: 100%;
-
-        max-width: 500px;
-
-        margin: 80px auto 0;
-    }
-
-    .brand-tagline {
-        font-size: 9px;
-
-        letter-spacing: 1.3px;
-    }
-
-    .brand-title {
-        font-size: 39px;
-
-        letter-spacing: -1.2px;
-    }
-
-    .brand-desc {
-        font-size: 11px;
-
-        line-height: 1.65;
-    }
-
-    .service-grid {
-        display: none;
-    }
-
-    .brand-footer {
-        margin-top: auto;
-
-        font-size: 9px;
-    }
-
-    .form-panel {
+    .navbar__toggle { display: flex; }
+    .navbar__links {
         position: absolute;
-
-        top: 125px;
-        right: 0;
-
-        width: 100%;
-
-        height: auto;
-
-        min-height: calc(100vh - 125px);
-
-        padding:
-            20px
-            16px
-            40px;
-
-        align-items: flex-start;
-
-        justify-content: center;
+        top: var(--nav-h);
+        left: 0; right: 0;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
+        padding: 6px 28px 16px;
+        background: rgba(247, 245, 240, 0.98);
+        border-bottom: 1px solid #e3dfd5;
+        box-shadow: 0 14px 24px -12px rgba(6, 43, 99, 0.3);
+        opacity: 0;
+        transform: translateY(-8px);
+        pointer-events: none;
+        visibility: hidden;
+        transition: opacity 0.22s ease, transform 0.22s ease, visibility 0.22s;
     }
-
-    .form-inner {
-        width: 100%;
-
-        max-width: 430px;
+    .nav-check:checked ~ .navbar .navbar__links {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+        visibility: visible;
     }
-
-    .back-link {
-        margin-bottom: 10px;
-    }
-
-    .login-card {
-        padding: 27px 22px 23px;
-
-        border-radius: 18px;
-    }
-
-    .card-title {
-        font-size: 24px;
-    }
-
-    .card-sub {
-        font-size: 12px;
-    }
-
-    .card-help {
-        font-size: 10px;
-    }
+    .navbar__link { padding: 14px 0; border-bottom: 1px solid #e3dfd5; }
+    .navbar__link:last-child { border-bottom: 0; }
+    .navbar__link::after { display: none; }
 }
 
+/* Mobile */
+@media (max-width: 560px) {
+    .container { padding: 0 16px; }
+    .navbar__brand { width: 175px; }
+    .navbar__links { padding-left: 16px; padding-right: 16px; }
 
-/* =========================================================
-   SMALL MOBILE
-   ========================================================= */
+    .hero__inner { padding-top: 28px; padding-bottom: 36px; gap: 26px; }
+    .hero__kicker { font-size: 0.64rem; letter-spacing: 0.06em; padding: 6px 12px; }
+    .hero__title { font-size: clamp(1.9rem, 9vw, 2.4rem); }
+    .hero__desc { font-size: 0.94rem; margin-bottom: 0; }
+    .service-grid { display: none; }
 
-@media (max-width: 430px) {
-
-    .brand-panel {
-        padding:
-            20px
-            16px
-            25px;
-    }
-
-    .brand-logo {
-        width: 175px;
-        height: auto;
-    }
-
-    .brand-body {
-        margin-top: 75px;
-    }
-
-    .brand-title {
-        font-size: 34px;
-
-        line-height: 1.05;
-    }
-
-    .brand-desc {
-        max-width: 100%;
-
-        font-size: 10px;
-    }
-
-    .form-panel {
-        top: 110px;
-
-        min-height: calc(100vh - 110px);
-
-        padding:
-            16px
-            12px
-            30px;
-    }
-
-    .login-card {
-        padding:
-            24px
-            18px
-            21px;
-
-        border-radius: 17px;
-    }
-
-    .card-icon {
-        width: 47px;
-        height: 47px;
-
-        margin-bottom: 13px;
-    }
-
-    .card-title {
-        font-size: 22px;
-    }
-
-    .field label {
-        font-size: 10px;
-    }
-
-    .input-wrap input {
-        font-size: 11px;
-    }
-
-    .row-between {
-        flex-wrap: wrap;
-    }
-}
-
-
-/* =========================================================
-   SHORT DESKTOP SCREEN
-   ========================================================= */
-
-@media (min-width: 761px) and (max-height: 720px) {
-
-    .brand-panel {
-        padding-top: 22px;
-        padding-bottom: 22px;
-    }
-
-    .brand-logo {
-        width: 220px;
-        height: 58px;
-    }
-
-    .brand-title {
-        font-size: 43px;
-    }
-
-    .brand-desc {
-        margin-bottom: 18px;
-    }
-
-    .login-card {
-        padding:
-            23px
-            30px
-            19px;
-    }
-
-    .card-icon {
-        width: 44px;
-        height: 44px;
-
-        margin-bottom: 10px;
-    }
-
-    .card-title {
-        font-size: 23px;
-    }
-
-    .card-help {
-        margin-bottom: 14px;
-    }
-
-    .field {
-        margin-bottom: 10px;
-    }
-
-    .input-wrap {
-        min-height: 43px;
-    }
-
-    .input-wrap input {
-        height: 41px;
-    }
-
-    .submit-btn {
-        min-height: 44px;
-    }
+    .login-card { padding: 26px 20px 22px; border-radius: 18px; }
+    .card-title { font-size: 1.5rem; }
+    /* 16px inputs stop iOS from zooming on focus */
+    .input-wrap input { font-size: 1rem; }
+    .input-wrap, .submit-btn { min-height: 52px; }
+    .toggle-password, .link-btn { min-height: 40px; }
 }
