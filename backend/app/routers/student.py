@@ -379,8 +379,6 @@ def get_route_bus(
                 )
 
             # Find bus through trips
-            
-            # Find active trip first, otherwise today's scheduled trip
             cursor.execute("""
                 SELECT
                     t.trip_id,
@@ -399,13 +397,8 @@ def get_route_bus(
                 JOIN buses b
                     ON t.bus_id = b.bus_id
                 WHERE t.route_id = %s
-                  AND (
-                      t.status = 'ACTIVE'
-                      OR (
-                          t.status = 'SCHEDULED'
-                          AND t.trip_date = CURRENT_DATE
-                      )
-                  )
+                  AND t.trip_date = CURRENT_DATE
+                  AND t.status IN ('ACTIVE', 'SCHEDULED')
                 ORDER BY
                     CASE
                         WHEN t.status = 'ACTIVE' THEN 1
@@ -413,10 +406,8 @@ def get_route_bus(
                     END,
                     t.start_time NULLS LAST
                 LIMIT 1
-            """, (route_id,))
-
+             """, (route_id,))
             trip = cursor.fetchone()
-
 
 
             if not trip:

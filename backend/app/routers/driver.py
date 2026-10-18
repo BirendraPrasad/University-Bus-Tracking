@@ -134,6 +134,39 @@ def get_my_current_trip(current_user: dict = Depends(require_driver)):
         conn.close()
 
 
+
+# List scheduled and active trips assigned to the logged-in driver
+@router.get("/me/trips/available")
+def get_my_available_trips(
+    current_user: dict = Depends(require_driver)
+):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            driver_id = _driver_id(cur, current_user["user_id"])
+
+            cur.execute(
+                TRIP_SELECT + """
+                    WHERE t.driver_id = %s
+                      AND t.status IN ('SCHEDULED', 'ACTIVE')
+                    ORDER BY
+                        CASE t.status
+                            WHEN 'ACTIVE' THEN 1
+                            WHEN 'SCHEDULED' THEN 2
+                            ELSE 3
+                        END,
+                        t.trip_date ASC,
+                        t.trip_id ASC
+                """,
+                (driver_id,)
+            )
+
+            return [_trip_dict(row) for row in cur.fetchall()]
+    finally:
+        conn.close()
+
+# ==========================================================================
+
 @router.post("/me/trips/{trip_id}/start")
 def start_trip(trip_id: int, current_user: dict = Depends(require_driver)):
     conn = get_connection()

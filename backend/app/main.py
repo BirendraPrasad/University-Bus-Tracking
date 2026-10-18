@@ -5,6 +5,7 @@ from backend.app.routers.auth import router as auth_router
 from backend.app.routers.student import router as student_router
 from backend.app.routers.driver import router as driver_router
 from fastapi.middleware.cors import CORSMiddleware
+from backend.app.routers import trips
 
 app = FastAPI(title="University Bus Tracking API")
 
@@ -49,3 +50,4 @@ app.include_router(user_router)
 app.include_router(auth_router)
 app.include_router(student_router)
 app.include_router(driver_router)
+app.include_router(trips.router)
