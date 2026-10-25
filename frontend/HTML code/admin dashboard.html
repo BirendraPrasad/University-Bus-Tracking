@@ -1,0 +1,341 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Admin Dashboard | University Bus Tracking</title>
+  <meta name="robots" content="noindex">
+  <link rel="stylesheet" href="../CSS/admin-dashboard.css">
+  <!-- <link rel="stylesheet" href="../CSS/admin-dashboard.css"> -->
+  <script src="../JavaScript/admin-dashboard.js" defer></script>
+  <script src="../JavaScript/admin-shell.js" defer></script>
+
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <div class="app">
+
+    <aside class="sidebar" id="sidebar" aria-label="Sidebar">
+      <div class="sidebar__brand">
+        <span class="brand-mark"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4" y="3" width="16" height="15" rx="2"/><path d="M4 11h16M8 21v-3M16 21v-3"/><circle cx="8" cy="15" r=".6"/><circle cx="16" cy="15" r=".6"/></svg></span>
+        <span class="brand-text"><strong>Bus Tracking</strong><span>Admin Console</span></span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Admin sections"><p class="nav-group-label" id="ng-operations">Operations</p><a class="nav-link" href="#overview" data-view="overview"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span>Overview</span></a><a class="nav-link" href="#live-map" data-view="live-map"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg><span>Live Map</span></a><p class="nav-group-label" id="ng-fleet">Fleet</p><a class="nav-link" href="#buses" data-view="buses"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4" y="3" width="16" height="15" rx="2"/><path d="M4 11h16M8 21v-3M16 21v-3"/><circle cx="8" cy="15" r=".6"/><circle cx="16" cy="15" r=".6"/></svg><span>Buses</span></a><a class="nav-link" href="#drivers" data-view="drivers"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg><span>Drivers</span></a><a class="nav-link" href="#routes" data-view="routes"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h6a4 4 0 0 0 0-8h-4a4 4 0 0 1 0-8h6"/></svg><span>Routes &amp; Stops</span></a><a class="nav-link" href="#trips" data-view="trips"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span>Trips</span></a><p class="nav-group-label" id="ng-people">People</p><a class="nav-link" href="#users" data-view="users"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg><span>All Users</span></a><a class="nav-link" href="#students" data-view="students"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m2 9 10-5 10 5-10 5z"/><path d="M6 11.5V16c0 1.5 3 3 6 3s6-1.5 6-3v-4.5"/></svg><span>Students</span></a><a class="nav-link" href="#faculty" data-view="faculty"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-3.5 3-5.5 7-5.5s7 2 7 5.5M16 4.5a3.5 3.5 0 0 1 0 7M18 15c2.5.6 4 2.3 4 5"/></svg><span>Faculty</span></a><p class="nav-group-label" id="ng-data">Data</p><a class="nav-link" href="#import" data-view="import"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg><span>Bulk Import</span></a></nav>
+      <div class="sidebar__footer">University Bus Tracking System</div>
+    </aside>
+    <div class="sidebar-backdrop" id="sidebarBackdrop" hidden></div>
+
+    <div class="main">
+      <header class="topbar">
+        <button class="btn btn--icon menu-toggle" type="button" id="menuToggle" aria-controls="sidebar" aria-expanded="false" aria-label="Open navigation menu"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+        <div class="topbar__title"><h1 id="pageTitle" tabindex="-1">Overview</h1><p id="pageDesc"></p></div>
+        <div class="user-chip">
+          <span class="avatar" id="userAvatar" aria-hidden="true">A</span>
+          <span class="user-chip__meta"><strong id="userName">Administrator</strong><span id="userRole">Admin</span></span>
+          <button class="btn btn--sm" type="button" id="signOutBtn"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 4H5v16h4M16 8l4 4-4 4M20 12H9"/></svg>Sign out</button>
+        </div>
+      </header>
+
+      <main class="content" id="main" tabindex="-1">
+        <div class="stage-banner" role="note"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 8v.5M12 11v5"/></svg>
+          <div><strong>Stage 5: read-only integration.</strong> Overview, Users, Buses, Drivers and Routes load live data from the existing API. Sections marked <strong>Pending</strong> need backend endpoints that do not exist yet and show no data. Creating and editing records is not connected yet.
+            <div class="legend"><span class="chip chip--api">Connected</span><span class="chip chip--new">Pending: endpoint to add</span><span class="chip chip--ph">Pending: not connected</span></div>
+          </div>
+        </div>
+        
+    <section class="view" id="view-overview" data-title="Overview" data-desc="Operational summary of buses, people, routes and trips." hidden>
+      <div class="page-head">
+        <div><h2>Overview</h2><p>Operational summary of buses, people, routes and trips.</p><div class="legend"><span class="chip chip--api">Counts: connected</span><span class="chip chip--new">Trips and GPS: pending</span></div></div>
+        <div class="page-actions"><span class="muted" id="lastRefreshed" aria-live="polite"></span><button class="btn" type="button" id="refreshBtn"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 11a8 8 0 0 0-14-4M4 4v4h4M4 13a8 8 0 0 0 14 4M20 20v-4h-4"/></svg>Refresh</button></div>
+      </div>
+      <div class="kpi-grid" id="kpiGrid"><article class="card kpi" aria-label="Total buses"><div class="kpi__label"><span>Total buses</span><span class="chip chip--api">Connected</span></div><div class="kpi__value" data-kpi="buses">—</div><div class="kpi__note" data-kpi-note="buses">From GET /users/buses</div></article><article class="card kpi" aria-label="Total drivers"><div class="kpi__label"><span>Total drivers</span><span class="chip chip--api">Connected</span></div><div class="kpi__value" data-kpi="drivers">—</div><div class="kpi__note" data-kpi-note="drivers">From GET /users/drivers</div></article><article class="card kpi" aria-label="Total routes"><div class="kpi__label"><span>Total routes</span><span class="chip chip--api">Connected</span></div><div class="kpi__value" data-kpi="routes">—</div><div class="kpi__note" data-kpi-note="routes">From GET /users/routes</div></article><article class="card kpi" aria-label="Active routes"><div class="kpi__label"><span>Active routes</span><span class="chip chip--api">Connected</span></div><div class="kpi__value" data-kpi="active-routes">—</div><div class="kpi__note" data-kpi-note="active-routes">Routes with is_active = true</div></article><article class="card kpi" aria-label="Buses with a driver"><div class="kpi__label"><span>Buses with a driver</span><span class="chip chip--api">Connected</span></div><div class="kpi__value" data-kpi="buses-assigned">—</div><div class="kpi__note" data-kpi-note="buses-assigned">Buses where driver_id is set</div></article><article class="card kpi" aria-label="User accounts"><div class="kpi__label"><span>User accounts</span><span class="chip chip--api">Connected</span></div><div class="kpi__value" data-kpi="users">—</div><div class="kpi__note" data-kpi-note="users">From GET /users/</div></article><article class="card kpi" aria-label="Student accounts"><div class="kpi__label"><span>Student accounts</span><span class="chip chip--api">Connected</span></div><div class="kpi__value" data-kpi="students">—</div><div class="kpi__note" data-kpi-note="students">Users with role STUDENT</div></article><article class="card kpi" aria-label="Scheduled trips"><div class="kpi__label"><span>Scheduled trips</span><span class="chip chip--new">Pending</span></div><div class="kpi__value is-pending" aria-label="Pending">—</div><div class="kpi__note">Needs a trip list endpoint</div></article><article class="card kpi" aria-label="Active trips"><div class="kpi__label"><span>Active trips</span><span class="chip chip--new">Pending</span></div><div class="kpi__value is-pending" aria-label="Pending">—</div><div class="kpi__note">Needs a trip list endpoint</div></article><article class="card kpi" aria-label="Buses with recent GPS"><div class="kpi__label"><span>Buses with recent GPS</span><span class="chip chip--new">Pending</span></div><div class="kpi__value is-pending" aria-label="Pending">—</div><div class="kpi__note">Needs a latest-GPS endpoint</div></article></div>
+      <div class="grid-2">
+        <section class="card" aria-labelledby="recent-h"><div class="card__head"><h3 id="recent-h">Recent trips</h3><span class="chip chip--new">Endpoint to add</span></div>
+          <div class="table-wrap">
+          <table class="data" id="tbl-recent" aria-label="Recent trips">
+            <thead><tr><th scope="col">Trip</th><th scope="col">Bus</th><th scope="col">Route</th><th scope="col">Driver</th><th scope="col">Date</th><th scope="col">Status</th></tr></thead>
+            <tbody><tr><td colspan="6"><div class="empty"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 13l3-8h12l3 8v6H3z"/><path d="M3 13h5l1 3h6l1-3h5"/></svg><strong>Pending: no endpoint yet</strong><p>This list needs a backend endpoint that does not exist yet. No data is shown and nothing is simulated.</p></div></td></tr></tbody>
+          </table>
+        </div>
+        <div class="pagination"><span>Showing 0 of 0</span>
+          <div class="pagination__controls"><button class="btn btn--sm" type="button" disabled>Previous</button><button class="btn btn--sm" type="button" disabled>Next</button></div>
+        </div>
+        </section>
+        <div class="stack">
+          <section class="card" aria-labelledby="qa-h"><div class="card__head"><h3 id="qa-h">Quick actions</h3><span class="chip chip--ph">Opens form layouts</span></div><div class="card__body"><div class="quick-actions"><button class="btn" type="button" data-open-dialog="dlg-bus"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>Add bus</button><button class="btn" type="button" data-open-dialog="dlg-driver"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>Add driver</button><button class="btn" type="button" data-open-dialog="dlg-student"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>Add student</button><button class="btn" type="button" data-open-dialog="dlg-route"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>Add route</button><button class="btn" type="button" data-open-dialog="dlg-trip"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>Create trip</button></div></div></section>
+          <section class="card" aria-labelledby="gps-h"><div class="card__head"><h3 id="gps-h">GPS connectivity</h3><span class="chip chip--new">Endpoint to add</span></div>
+            <div class="card__body"><div class="empty" style="padding:12px 0"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 21s7-6.2 7-11a7 7 0 0 0-14 0c0 4.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg><strong>No GPS status loaded</strong><p>Freshness (Live, Stale, Offline) will be calculated from real <code>bus_locations</code> timestamps. No status is shown until then.</p></div></div></section>
+        </div>
+      </div>
+    </section>
+    <section class="view" id="view-live-map" data-title="Live Map" data-desc="Latest authorised GPS position of each bus with a freshness indicator." hidden>
+      <div class="page-head">
+        <div><h2>Live Map</h2><p>Latest authorised GPS position of each bus with a freshness indicator.</p><div class="legend"><span class="chip chip--new">Endpoint to add</span><span class="chip chip--ph">Map not loaded</span></div></div>
+        <div class="page-actions"></div>
+      </div>
+      <div class="pending-note" role="note"><strong>Pending.</strong> The live map and GPS freshness need a latest-location endpoint and are not built yet. No bus positions are shown.</div>
+      <div class="map-layout">
+        <section class="card" aria-labelledby="map-h"><div class="card__head"><h3 id="map-h">Fleet map</h3><span class="chip chip--ph">Pending: map not connected</span></div>
+          <div class="map-canvas" role="img" aria-label="Map placeholder. The live map is not connected yet."><div><strong>Map placeholder</strong>No bus markers are drawn because no GPS data is connected.</div></div></section>
+        <div class="stack">
+          <section class="card" aria-labelledby="fr-h"><div class="card__head"><h3 id="fr-h">GPS freshness rules</h3></div><div class="card__body">
+            <ul class="plain fresh-legend">
+              <li><span class="chip chip--api">Live</span><span>Last update 60 seconds ago or less.</span></li>
+              <li><span class="chip chip--new">Stale</span><span>Last update between 60 seconds and 5 minutes ago.</span></li>
+              <li><span class="chip chip--ph">Offline</span><span>No update for over 5 minutes, or no GPS record at all. Never shown as live.</span></li>
+            </ul><p class="hint" style="margin-top:12px;font-size:12.5px;color:var(--text-muted)">Thresholds will be configurable. Time is based on when the row was stored.</p></div></section>
+          <section class="card" aria-labelledby="sel-h"><div class="card__head"><h3 id="sel-h">Selected bus</h3></div><div class="card__body">
+            <dl class="dl"><dt>Bus</dt><dd>—</dd><dt>Trip</dt><dd>—</dd><dt>Latitude</dt><dd>—</dd><dt>Longitude</dt><dd>—</dd><dt>Last update</dt><dd>—</dd><dt>Freshness</dt><dd>—</dd></dl></div></section>
+        </div>
+      </div>
+    </section>
+    <section class="view" id="view-buses" data-title="Buses" data-desc="Manage the fleet and driver assignments." hidden>
+      <div class="page-head">
+        <div><h2>Buses</h2><p>Manage the fleet and driver assignments.</p><div class="legend"><span class="chip chip--api">List: connected</span><span class="chip chip--new">Detail, edit, GPS: to add</span></div></div>
+        <div class="page-actions"><button class="btn btn--primary" type="button" data-open-dialog="dlg-bus"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>Add bus</button></div>
+      </div>
+      <section class="card"><div class="toolbar" role="search"><div class="field field--search"><label for="bus-search">Search</label><input class="input" id="bus-search" type="search" placeholder="Bus number or registration"></div><div class="field"><label for="bus-type">Bus type</label><select class="select" id="bus-type"><option value="">All types</option><option>ROUTE_BUS</option><option>SHUTTLE_BUS</option></select></div><div class="field"><label for="bus-driver">Driver</label><select class="select" id="bus-driver"><option value="">All drivers</option></select></div></div>
+        <div class="table-wrap">
+          <table class="data" id="tbl-buses" aria-label="Buses">
+            <thead><tr><th scope="col">Bus number</th><th scope="col">Type</th><th scope="col" class=num>Capacity</th><th scope="col">Registration</th><th scope="col">Driver</th><th scope="col">GPS</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="pagination"><span>Showing 0 of 0</span>
+          <div class="pagination__controls"><button class="btn btn--sm" type="button" disabled>Previous</button><button class="btn btn--sm" type="button" disabled>Next</button></div>
+        </div></section>
+    </section>
+    <section class="view" id="view-drivers" data-title="Drivers" data-desc="Driver accounts, licences and assigned buses." hidden>
+      <div class="page-head">
+        <div><h2>Drivers</h2><p>Driver accounts, licences and assigned buses.</p><div class="legend"><span class="chip chip--api">List: connected</span><span class="chip chip--new">Detail, edit: to add</span></div></div>
+        <div class="page-actions"><button class="btn btn--primary" type="button" data-open-dialog="dlg-driver"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>Add driver</button></div>
+      </div>
+      <section class="card"><div class="toolbar" role="search"><div class="field field--search"><label for="drv-search">Search</label><input class="input" id="drv-search" type="search" placeholder="Name, email or licence number"></div></div>
+        <div class="table-wrap">
+          <table class="data" id="tbl-drivers" aria-label="Drivers">
+            <thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Licence number</th><th scope="col">Phone</th><th scope="col">Assigned bus</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="pagination"><span>Showing 0 of 0</span>
+          <div class="pagination__controls"><button class="btn btn--sm" type="button" disabled>Previous</button><button class="btn btn--sm" type="button" disabled>Next</button></div>
+        </div></section>
+    </section>
+    <section class="view" id="view-routes" data-title="Routes &amp; Stops" data-desc="Routes and the ordered stops on each route." hidden>
+      <div class="page-head">
+        <div><h2>Routes &amp; Stops</h2><p>Routes and the ordered stops on each route.</p><div class="legend"><span class="chip chip--api">Routes and stops: connected, read-only</span><span class="chip chip--new">Edit, reorder: to add</span></div></div>
+        <div class="page-actions"><button class="btn btn--primary" type="button" data-open-dialog="dlg-route"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>Add route</button></div>
+      </div>
+      <div class="grid-2">
+        <section class="card" aria-labelledby="rt-h"><div class="card__head"><h3 id="rt-h">Routes</h3></div><div class="toolbar" role="search"><div class="field field--search"><label for="rt-search">Search</label><input class="input" id="rt-search" type="search" placeholder="Route name or code"></div></div>
+          <div class="table-wrap">
+          <table class="data" id="tbl-routes" aria-label="Routes">
+            <thead><tr><th scope="col">Code</th><th scope="col">Name</th><th scope="col">Start</th><th scope="col">End</th><th scope="col">Status</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="pagination"><span>Showing 0 of 0</span>
+          <div class="pagination__controls"><button class="btn btn--sm" type="button" disabled>Previous</button><button class="btn btn--sm" type="button" disabled>Next</button></div>
+        </div></section>
+        <section class="card" aria-labelledby="st-h"><div class="card__head"><h3 id="st-h">Stops <span id="stopsRouteName" class="muted"></span></h3><button class="btn btn--sm" type="button" data-open-dialog="dlg-stop"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>Add stop</button></div>
+          <div class="table-wrap">
+          <table class="data" id="tbl-stops" aria-label="Stops">
+            <thead><tr><th scope="col" class=num>Order</th><th scope="col">Stop</th><th scope="col">Latitude</th><th scope="col">Longitude</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="pagination"><span>Showing 0 of 0</span>
+          <div class="pagination__controls"><button class="btn btn--sm" type="button" disabled>Previous</button><button class="btn btn--sm" type="button" disabled>Next</button></div>
+        </div></section>
+      </div>
+    </section>
+    <section class="view" id="view-trips" data-title="Trips" data-desc="Scheduled, active, completed and cancelled trips." hidden>
+      <div class="page-head">
+        <div><h2>Trips</h2><p>Scheduled, active, completed and cancelled trips.</p><div class="legend"><span class="chip chip--api">Create: API exists, not connected yet</span><span class="chip chip--new">List and filters: to add</span></div></div>
+        <div class="page-actions"><button class="btn btn--primary" type="button" data-open-dialog="dlg-trip"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>Create trip</button></div>
+      </div>
+      <div class="pending-note" role="note"><strong>Pending.</strong> There is no trip list endpoint yet, so no trips can be shown. Trip creation exists in the API but is not connected here.</div>
+      <section class="card"><div class="toolbar" role="search"><div class="field field--search"><label for="trip-search">Search</label><input class="input" id="trip-search" type="search" placeholder="Trip ID, bus or route" disabled></div><div class="field"><label for="trip-status">Status</label><select class="select" id="trip-status" disabled><option value="">All statuses</option><option>SCHEDULED</option><option>ACTIVE</option><option>COMPLETED</option><option>CANCELLED</option></select></div></div>
+        <div class="toolbar" style="border-top:0"><div class="field"><label for="trip-date">Trip date</label><input class="input" id="trip-date" type="date" disabled></div></div>
+        <div class="table-wrap">
+          <table class="data" id="tbl-trips" aria-label="Trips">
+            <thead><tr><th scope="col">Trip</th><th scope="col">Bus</th><th scope="col">Route</th><th scope="col">Driver</th><th scope="col">Date</th><th scope="col">Status</th></tr></thead>
+            <tbody><tr><td colspan="6"><div class="empty"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 13l3-8h12l3 8v6H3z"/><path d="M3 13h5l1 3h6l1-3h5"/></svg><strong>Pending: no endpoint yet</strong><p>This list needs a backend endpoint that does not exist yet. No data is shown and nothing is simulated.</p></div></td></tr></tbody>
+          </table>
+        </div>
+        <div class="pagination"><span>Showing 0 of 0</span>
+          <div class="pagination__controls"><button class="btn btn--sm" type="button" disabled>Previous</button><button class="btn btn--sm" type="button" disabled>Next</button></div>
+        </div></section>
+    </section>
+    <section class="view" id="view-users" data-title="All Users" data-desc="Every account in the system, from the existing users table." hidden>
+      <div class="page-head">
+        <div><h2>All Users</h2><p>Every account in the system, from the existing users table.</p><div class="legend"><span class="chip chip--api">Connected: GET /users/</span><span class="chip chip--new">Create and edit: pending</span></div></div>
+        <div class="page-actions"></div>
+      </div>
+      <section class="card"><div class="toolbar" role="search"><div class="field field--search"><label for="usr-search">Search</label><input class="input" id="usr-search" type="search" placeholder="Name or email"></div><div class="field"><label for="usr-role">Role</label><select class="select" id="usr-role"><option value="">All roles</option><option>ADMIN</option><option>DRIVER</option><option>FACULTY</option><option>STUDENT</option></select></div></div>
+        <div class="table-wrap"><table class="data" id="tbl-users" aria-label="Users"><thead><tr><th scope="col" class="num">ID</th><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Role</th><th scope="col">Status</th></tr></thead><tbody></tbody></table></div>
+        <div class="pagination"><span>Showing 0 of 0</span><div class="pagination__controls"><button class="btn btn--sm" type="button" disabled>Previous</button><button class="btn btn--sm" type="button" disabled>Next</button></div></div></section>
+    </section>
+    <section class="view" id="view-students" data-title="Students" data-desc="Student accounts and profiles." hidden>
+      <div class="page-head">
+        <div><h2>Students</h2><p>Student accounts and profiles.</p><div class="legend"><span class="chip chip--new">List: to add</span><span class="chip chip--api">Create: API exists, not connected yet</span></div></div>
+        <div class="page-actions"><button class="btn btn--primary" type="button" data-open-dialog="dlg-student"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>Add student</button></div>
+      </div>
+      <div class="pending-note" role="note"><strong>Pending.</strong> There is no student list endpoint yet. Student accounts can be seen in All Users. Student profile details (enrolment, department, semester) are pending.</div>
+      <section class="card"><div class="toolbar" role="search"><div class="field field--search"><label for="stu-search">Search</label><input class="input" id="stu-search" type="search" placeholder="Name, email or enrolment number" disabled></div><div class="field"><label for="stu-dept">Department</label><select class="select" id="stu-dept" disabled><option value="">All departments</option></select></div><div class="field"><label for="stu-sem">Semester</label><select class="select" id="stu-sem" disabled><option value="">All semesters</option></select></div></div>
+        <div class="table-wrap">
+          <table class="data" id="tbl-students" aria-label="Students">
+            <thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Enrolment no.</th><th scope="col">Department</th><th scope="col">Semester</th><th scope="col">Status</th></tr></thead>
+            <tbody><tr><td colspan="6"><div class="empty"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 13l3-8h12l3 8v6H3z"/><path d="M3 13h5l1 3h6l1-3h5"/></svg><strong>Pending: no endpoint yet</strong><p>This list needs a backend endpoint that does not exist yet. No data is shown and nothing is simulated.</p></div></td></tr></tbody>
+          </table>
+        </div>
+        <div class="pagination"><span>Showing 0 of 0</span>
+          <div class="pagination__controls"><button class="btn btn--sm" type="button" disabled>Previous</button><button class="btn btn--sm" type="button" disabled>Next</button></div>
+        </div></section>
+    </section>
+    <section class="view" id="view-faculty" data-title="Faculty" data-desc="Faculty accounts and profiles." hidden>
+      <div class="page-head">
+        <div><h2>Faculty</h2><p>Faculty accounts and profiles.</p><div class="legend"><span class="chip chip--new">List: to add</span><span class="chip chip--api">Create: API exists, not connected yet</span></div></div>
+        <div class="page-actions"><button class="btn btn--primary" type="button" data-open-dialog="dlg-faculty"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>Add faculty</button></div>
+      </div>
+      <div class="pending-note" role="note"><strong>Pending.</strong> There is no faculty list endpoint yet. Faculty accounts can be seen in All Users. Faculty profile details are pending.</div>
+      <section class="card"><div class="toolbar" role="search"><div class="field field--search"><label for="fac-search">Search</label><input class="input" id="fac-search" type="search" placeholder="Name, email or employee ID" disabled></div><div class="field"><label for="fac-dept">Department</label><select class="select" id="fac-dept" disabled><option value="">All departments</option></select></div></div>
+        <div class="table-wrap">
+          <table class="data" id="tbl-faculty" aria-label="Faculty">
+            <thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Employee ID</th><th scope="col">Department</th><th scope="col">Status</th></tr></thead>
+            <tbody><tr><td colspan="5"><div class="empty"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 13l3-8h12l3 8v6H3z"/><path d="M3 13h5l1 3h6l1-3h5"/></svg><strong>Pending: no endpoint yet</strong><p>This list needs a backend endpoint that does not exist yet. No data is shown and nothing is simulated.</p></div></td></tr></tbody>
+          </table>
+        </div>
+        <div class="pagination"><span>Showing 0 of 0</span>
+          <div class="pagination__controls"><button class="btn btn--sm" type="button" disabled>Previous</button><button class="btn btn--sm" type="button" disabled>Next</button></div>
+        </div></section>
+    </section>
+    <section class="view" id="view-import" data-title="Bulk Import" data-desc="Import buses, drivers, students, routes and stops from CSV or Excel." hidden>
+      <div class="page-head">
+        <div><h2>Bulk Import</h2><p>Import buses, drivers, students, routes and stops from CSV or Excel.</p><div class="legend"><span class="chip chip--new">Backend import endpoints: to add</span><span class="chip chip--ph">Nothing is uploaded from this page yet</span></div></div>
+        <div class="page-actions"></div>
+      </div>
+      <div class="pending-note" role="note"><strong>Pending.</strong> Bulk import needs backend upload endpoints that do not exist yet. Nothing can be uploaded from this page.</div>
+      <section class="card" aria-labelledby="imp-h"><div class="card__head"><h3 id="imp-h">Import workflow</h3></div><div class="card__body">
+        <ol class="steps"><li>Choose data type and download the template</li><li>Upload a CSV or Excel file</li><li>Preview rows; review valid and invalid counts</li><li>Confirm. All rows import in one transaction, or none.</li></ol>
+        <div class="form-grid">
+          <div class="field"><label for="imp-type">Data type <span class="req" aria-hidden="true">*</span></label><select class="select" id="imp-type" name="imp-type" required aria-describedby="imp-type-hint"><option value="">Select a data type</option><option value="buses">Buses</option><option value="drivers">Drivers</option><option value="students">Students</option><option value="routes">Routes</option><option value="stops">Stops</option></select><span class="hint" id="imp-type-hint">Templates are pending.</span></div>
+          <div class="field"><span class="label">Template</span><button class="btn" type="button" disabled>Download template</button></div>
+          <div class="field span-2"><label for="imp-file">File</label><div class="dropzone"><input id="imp-file" type="file" accept=".csv,.xlsx,.xls" disabled><span>CSV or Excel. File type and size are validated on the server.</span></div></div>
+        </div></div></section>
+      <section class="card" style="margin-top:20px" aria-labelledby="prev-h"><div class="card__head"><h3 id="prev-h">Preview and validation results</h3></div>
+        <div class="card__body"><div class="empty"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 13l3-8h12l3 8v6H3z"/><path d="M3 13h5l1 3h6l1-3h5"/></svg><strong>No file selected</strong><p>Valid and invalid row counts and row-by-row errors appear here after a file is validated.</p></div></div></section>
+    </section>
+      </main>
+    </div>
+  </div>
+
+  <dialog id="dlg-bus" aria-labelledby="dlg-bus-t">
+    <form method="dialog" novalidate>
+      <div class="dialog__head"><h2 id="dlg-bus-t">Add bus</h2>
+        <button class="btn btn--ghost btn--icon" type="button" data-close-dialog aria-label="Close dialog"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+      <div class="dialog__body">
+        <p class="note">Pending: creating records from the dashboard is not connected yet. This form is a layout preview only.</p>
+        <div class="form-grid"><div class="field"><label for="bus_number">Bus number <span class="req" aria-hidden="true">*</span></label><input class="input" id="bus_number" name="bus_number" type="text" required maxlength="50"></div><div class="field"><label for="bus_type">Bus type <span class="req" aria-hidden="true">*</span></label><select class="select" id="bus_type" name="bus_type" required><option value="">Select type</option><option value="ROUTE_BUS">ROUTE_BUS</option><option value="SHUTTLE_BUS">SHUTTLE_BUS</option></select></div><div class="field"><label for="capacity">Capacity <span class="req" aria-hidden="true">*</span></label><input class="input" id="capacity" name="capacity" type="number" required min="1" step="1" inputmode="numeric"></div><div class="field"><label for="registration_number">Registration number <span class="req" aria-hidden="true">*</span></label><input class="input" id="registration_number" name="registration_number" type="text" required maxlength="50"></div></div>
+      </div>
+      <div class="dialog__foot">
+        <button class="btn" type="button" data-close-dialog>Cancel</button>
+        <button class="btn btn--primary" type="submit" disabled aria-disabled="true">Save (pending)</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="dlg-driver" aria-labelledby="dlg-driver-t">
+    <form id="driverForm" novalidate>
+      <div class="dialog__head"><h2 id="dlg-driver-t">Add driver</h2>
+        <button class="btn btn--ghost btn--icon" type="button" data-close-dialog aria-label="Close dialog"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+      <div class="dialog__body">
+        <p class="note">Enter the driver's details to create a driver account.</p>
+        <div class="form-grid"><div class="field"><label for="d_name">Full name <span class="req" aria-hidden="true">*</span></label><input class="input" id="d_name" name="d_name" type="text" required maxlength="100"></div><div class="field"><label for="d_email">Email <span class="req" aria-hidden="true">*</span></label><input class="input" id="d_email" name="d_email" type="email" required maxlength="150" autocomplete="off"></div><div class="field"><label for="d_password">Temporary password <span class="req" aria-hidden="true">*</span></label><input class="input" id="d_password" name="d_password" type="password" required aria-describedby="d_password-hint" autocomplete="new-password" minlength="8"><span class="hint" id="d_password-hint">Hashed by the backend. Never stored in the browser.</span></div><div class="field"><label for="license_number">Licence number <span class="req" aria-hidden="true">*</span></label><input class="input" id="license_number" name="license_number" type="text" required maxlength="50"></div><div class="field"><label for="phone">Phone <span class="req" aria-hidden="true">*</span></label><input class="input" id="phone" name="phone" type="tel" required maxlength="20"></div></div>
+      </div>
+      <div class="dialog__foot">
+        <button class="btn" type="button" data-close-dialog>Cancel</button>
+        <button class="btn btn--primary" type="submit">Save Driver</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="dlg-student" aria-labelledby="dlg-student-t">
+    <form method="dialog" novalidate>
+      <div class="dialog__head"><h2 id="dlg-student-t">Add student</h2>
+        <button class="btn btn--ghost btn--icon" type="button" data-close-dialog aria-label="Close dialog"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+      <div class="dialog__body">
+        <p class="note">Pending: creating records from the dashboard is not connected yet. This form is a layout preview only.</p>
+        <div class="form-grid"><div class="field"><label for="s_name">Full name <span class="req" aria-hidden="true">*</span></label><input class="input" id="s_name" name="s_name" type="text" required maxlength="100"></div><div class="field"><label for="s_email">Email <span class="req" aria-hidden="true">*</span></label><input class="input" id="s_email" name="s_email" type="email" required maxlength="150" autocomplete="off"></div><div class="field"><label for="s_password">Temporary password <span class="req" aria-hidden="true">*</span></label><input class="input" id="s_password" name="s_password" type="password" required aria-describedby="s_password-hint" autocomplete="new-password" minlength="8"><span class="hint" id="s_password-hint">Hashed by the backend. Never stored in the browser.</span></div><div class="field"><label for="enrollment_no">Enrolment number <span class="req" aria-hidden="true">*</span></label><input class="input" id="enrollment_no" name="enrollment_no" type="text" required maxlength="50"></div><div class="field"><label for="s_department">Department <span class="req" aria-hidden="true">*</span></label><input class="input" id="s_department" name="s_department" type="text" required maxlength="100"></div><div class="field"><label for="semester">Semester <span class="req" aria-hidden="true">*</span></label><input class="input" id="semester" name="semester" type="number" required min="1" max="12" step="1" inputmode="numeric"></div></div>
+      </div>
+      <div class="dialog__foot">
+        <button class="btn" type="button" data-close-dialog>Cancel</button>
+        <button class="btn btn--primary" type="submit" disabled aria-disabled="true">Save (pending)</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="dlg-faculty" aria-labelledby="dlg-faculty-t">
+    <form method="dialog" novalidate>
+      <div class="dialog__head"><h2 id="dlg-faculty-t">Add faculty</h2>
+        <button class="btn btn--ghost btn--icon" type="button" data-close-dialog aria-label="Close dialog"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+      <div class="dialog__body">
+        <p class="note">Pending: creating records from the dashboard is not connected yet. This form is a layout preview only.</p>
+        <div class="form-grid"><div class="field"><label for="f_name">Full name <span class="req" aria-hidden="true">*</span></label><input class="input" id="f_name" name="f_name" type="text" required maxlength="100"></div><div class="field"><label for="f_email">Email <span class="req" aria-hidden="true">*</span></label><input class="input" id="f_email" name="f_email" type="email" required maxlength="150" autocomplete="off"></div><div class="field"><label for="f_password">Temporary password <span class="req" aria-hidden="true">*</span></label><input class="input" id="f_password" name="f_password" type="password" required aria-describedby="f_password-hint" autocomplete="new-password" minlength="8"><span class="hint" id="f_password-hint">Hashed by the backend. Never stored in the browser.</span></div><div class="field"><label for="employee_id">Employee ID <span class="req" aria-hidden="true">*</span></label><input class="input" id="employee_id" name="employee_id" type="text" required maxlength="50"></div><div class="field"><label for="f_department">Department <span class="req" aria-hidden="true">*</span></label><input class="input" id="f_department" name="f_department" type="text" required maxlength="100"></div></div>
+      </div>
+      <div class="dialog__foot">
+        <button class="btn" type="button" data-close-dialog>Cancel</button>
+        <button class="btn btn--primary" type="submit" disabled aria-disabled="true">Save (pending)</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="dlg-route" aria-labelledby="dlg-route-t">
+    <form method="dialog" novalidate>
+      <div class="dialog__head"><h2 id="dlg-route-t">Add route</h2>
+        <button class="btn btn--ghost btn--icon" type="button" data-close-dialog aria-label="Close dialog"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+      <div class="dialog__body">
+        <p class="note">Pending: creating records from the dashboard is not connected yet. This form is a layout preview only.</p>
+        <div class="form-grid"><div class="field"><label for="route_name">Route name <span class="req" aria-hidden="true">*</span></label><input class="input" id="route_name" name="route_name" type="text" required maxlength="100"></div><div class="field"><label for="route_code">Route code <span class="req" aria-hidden="true">*</span></label><input class="input" id="route_code" name="route_code" type="text" required maxlength="50"></div><div class="field"><label for="start_point">Start point</label><input class="input" id="start_point" name="start_point" type="text" maxlength="150"></div><div class="field"><label for="end_point">End point</label><input class="input" id="end_point" name="end_point" type="text" maxlength="150"></div><div class="field span-2"><label for="description">Description</label><textarea class="textarea" id="description" name="description" rows="3"></textarea></div></div>
+      </div>
+      <div class="dialog__foot">
+        <button class="btn" type="button" data-close-dialog>Cancel</button>
+        <button class="btn btn--primary" type="submit" disabled aria-disabled="true">Save (pending)</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="dlg-stop" aria-labelledby="dlg-stop-t">
+    <form method="dialog" novalidate>
+      <div class="dialog__head"><h2 id="dlg-stop-t">Add stop</h2>
+        <button class="btn btn--ghost btn--icon" type="button" data-close-dialog aria-label="Close dialog"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+      <div class="dialog__body">
+        <p class="note">Pending: creating records from the dashboard is not connected yet. This form is a layout preview only.</p>
+        <div class="form-grid"><div class="field span-2"><label for="stop_route">Route <span class="req" aria-hidden="true">*</span></label><select class="select" id="stop_route" name="stop_route" required><option value="">Pending: not connected yet</option></select></div><div class="field span-2"><label for="stop_name">Stop name <span class="req" aria-hidden="true">*</span></label><input class="input" id="stop_name" name="stop_name" type="text" required maxlength="150"></div><div class="field"><label for="latitude">Latitude <span class="req" aria-hidden="true">*</span></label><input class="input" id="latitude" name="latitude" type="number" required aria-describedby="latitude-hint" min="-90" max="90" step="any"><span class="hint" id="latitude-hint">-90 to 90</span></div><div class="field"><label for="longitude">Longitude <span class="req" aria-hidden="true">*</span></label><input class="input" id="longitude" name="longitude" type="number" required aria-describedby="longitude-hint" min="-180" max="180" step="any"><span class="hint" id="longitude-hint">-180 to 180</span></div><div class="field"><label for="stop_order">Stop order <span class="req" aria-hidden="true">*</span></label><input class="input" id="stop_order" name="stop_order" type="number" required aria-describedby="stop_order-hint" min="1" step="1"><span class="hint" id="stop_order-hint">Must be unique within the route.</span></div></div>
+      </div>
+      <div class="dialog__foot">
+        <button class="btn" type="button" data-close-dialog>Cancel</button>
+        <button class="btn btn--primary" type="submit" disabled aria-disabled="true">Save (pending)</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="dlg-trip" aria-labelledby="dlg-trip-t">
+    <form method="dialog" novalidate>
+      <div class="dialog__head"><h2 id="dlg-trip-t">Create trip</h2>
+        <button class="btn btn--ghost btn--icon" type="button" data-close-dialog aria-label="Close dialog"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+      <div class="dialog__body">
+        <p class="note">Pending: creating records from the dashboard is not connected yet. This form is a layout preview only.</p>
+        <div class="form-grid"><div class="field"><label for="trip_bus">Bus <span class="req" aria-hidden="true">*</span></label><select class="select" id="trip_bus" name="trip_bus" required><option value="">Pending: not connected yet</option></select></div><div class="field"><label for="trip_route">Route <span class="req" aria-hidden="true">*</span></label><select class="select" id="trip_route" name="trip_route" required><option value="">Pending: not connected yet</option></select></div><div class="field"><label for="trip_driver">Driver <span class="req" aria-hidden="true">*</span></label><select class="select" id="trip_driver" name="trip_driver" required aria-describedby="trip_driver-hint"><option value="">Pending: not connected yet</option></select><span class="hint" id="trip_driver-hint">Must be the driver assigned to the selected bus.</span></div><div class="field"><label for="trip_date_in">Trip date <span class="req" aria-hidden="true">*</span></label><input class="input" id="trip_date_in" name="trip_date_in" type="date" required ></div></div>
+      </div>
+      <div class="dialog__foot">
+        <button class="btn" type="button" data-close-dialog>Cancel</button>
+        <button class="btn btn--primary" type="submit" disabled aria-disabled="true">Save (pending)</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="dlg-confirm" aria-labelledby="dlg-confirm-t" aria-describedby="dlg-confirm-d">
+    <form method="dialog"><div class="dialog__head"><h2 id="dlg-confirm-t">Confirm action</h2></div>
+      <div class="dialog__body"><p id="dlg-confirm-d">Destructive actions will ask for confirmation here. No destructive action is connected yet.</p></div>
+      <div class="dialog__foot"><button class="btn" type="button" data-close-dialog>Cancel</button><button class="btn btn--danger" type="button" disabled>Confirm</button></div></form>
+  </dialog>
+  <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+  <!-- <script src="../JavaScript/Admin shell.js"></script>
+  <script src="../JavaScript/Admin dashboard.js"></script> -->
+</body>
+</html>
