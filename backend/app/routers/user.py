@@ -1,9 +1,26 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
+
+from pathlib import Path
+import shutil
+import uuid
+
 
 from backend.app.dependencies import get_current_user, require_admin
 from backend.app.database.connection import get_connection
-from backend.app.schemas.user import ( UserCreate, StudentCreate, DriverCreate, FacultyCreate,
-             BusCreate, RouteCreate,StopCreate, BusAssignDriver)
+
+
+from backend.app.schemas.user import (
+    UserCreate,
+    StudentCreate,
+    DriverCreate,
+    FacultyCreate,
+    BusCreate,
+    BusUpdate,
+    RouteCreate,
+    StopCreate,
+    BusAssignDriver
+)
+
 from backend.app.services.security import hash_password
 
 from datetime import date, datetime
@@ -618,6 +635,248 @@ def get_drivers(
 
     finally:
         conn.close()   
+
+
+# Admin: Update bus details
+@router.put("/buses/{bus_id}")
+def update_bus(
+    bus_id: int,
+    bus: BusUpdate,
+    current_user: dict = Depends(require_admin)
+):
+    conn = get_connection()
+
+    try:
+        update_fields = bus.model_dump(exclude_unset=True)
+
+        if not update_fields:
+            raise HTTPException(
+                status_code=400,
+                detail="No fields provided for update"
+            )
+
+        allowed_fields = {
+            "bus_number",
+            "bus_type",
+            "capacity",
+            "registration_number"
+        }
+
+        invalid_fields = set(update_fields) - allowed_fields
+
+        if invalid_fields:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid fields provided"
+            )
+
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT bus_id
+                FROM buses
+                WHERE bus_id = %s
+            """, (bus_id,))
+
+            if not cursor.fetchone():
+                raise HTTPException(
+                    status_code=404,
+                    detail="Bus not found"
+                )
+
+            set_clause = ", ".join(
+                f"{field} = %s" for field in update_fields
+            )
+
+            values = list(update_fields.values()) + [bus_id]
+
+            cursor.execute(
+                f"""
+                UPDATE buses
+                SET {set_clause}
+                WHERE bus_id = %s
+                RETURNING bus_id, bus_number, bus_type,
+                          capacity, registration_number, driver_id
+                """,
+                values
+            )
+
+            updated_bus = cursor.fetchone()
+            conn.commit()
+
+            return {
+                "message": "Bus updated successfully",
+                "bus_id": updated_bus[0],
+                "bus_number": updated_bus[1],
+                "bus_type": updated_bus[2],
+                "capacity": updated_bus[3],
+                "registration_number": updated_bus[4],
+                "driver_id": updated_bus[5]
+            }
+
+    except Exception:
+        conn.rollback()
+        raise
+
+    finally:
+        conn.close()
+
+# Admin: Delete a bus
+@router.delete("/buses/{bus_id}")
+def delete_bus(
+    bus_id: int,
+    current_user: dict = Depends(require_admin)
+):
+    conn = get_connection()
+
+    try:
+        with conn.cursor() as cursor:
+
+            # Check whether bus exists
+            cursor.execute("""
+                SELECT bus_id
+                FROM buses
+                WHERE bus_id = %s
+            """, (bus_id,))
+
+            bus = cursor.fetchone()
+
+            if not bus:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Bus not found"
+                )
+
+            # Prevent deletion if trips are linked
+            cursor.execute("""
+                SELECT COUNT(*)
+                FROM trips
+                WHERE bus_id = %s
+            """, (bus_id,))
+
+            trip_count = cursor.fetchone()[0]
+
+            if trip_count > 0:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Cannot delete bus because trips are linked to it"
+                )
+
+            # Delete bus
+            cursor.execute("""
+                DELETE FROM buses
+                WHERE bus_id = %s
+                RETURNING bus_id, bus_number
+            """, (bus_id,))
+
+            deleted_bus = cursor.fetchone()
+            conn.commit()
+
+            return {
+                "message": "Bus deleted successfully",
+                "bus_id": deleted_bus[0],
+                "bus_number": deleted_bus[1]
+            }
+
+    except Exception:
+        conn.rollback()
+        raise
+
+    finally:
+        conn.close()
+
+
+# Admin: Upload bus photos
+@router.post("/buses/{bus_id}/photos")
+def upload_bus_photos(
+    bus_id: int,
+    front_photo: UploadFile | None = File(None),
+    side_photo: UploadFile | None = File(None),
+    current_user: dict = Depends(require_admin)
+):
+    upload_dir = Path("backend/uploads/buses")
+    upload_dir.mkdir(parents=True, exist_ok=True)
+
+    allowed_types = ["image/jpeg", "image/png", "image/webp"]
+
+    conn = get_connection()
+
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "SELECT bus_id FROM buses WHERE bus_id = %s",
+                (bus_id,)
+            )
+
+            if not cursor.fetchone():
+                raise HTTPException(
+                    status_code=404,
+                    detail="Bus not found"
+                )
+
+            photo_paths = {}
+
+            for field, photo in [
+                ("front_photo", front_photo),
+                ("side_photo", side_photo)
+            ]:
+                if photo is None:
+                    continue
+
+                if photo.content_type not in allowed_types:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Only JPG, PNG and WEBP images are allowed"
+                    )
+
+                extension = Path(photo.filename or "").suffix.lower()
+
+                if extension not in [".jpg", ".jpeg", ".png", ".webp"]:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Invalid image extension"
+                    )
+
+                filename = f"{bus_id}_{field}_{uuid.uuid4().hex}{extension}"
+                file_path = upload_dir / filename
+
+                with file_path.open("wb") as buffer:
+                    shutil.copyfileobj(photo.file, buffer)
+
+                photo_paths[field] = f"/uploads/buses/{filename}"
+
+            if not photo_paths:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Please select at least one photo"
+                )
+
+            set_clause = ", ".join(
+                f"{field} = %s" for field in photo_paths
+            )
+
+            cursor.execute(
+                f"""
+                UPDATE buses
+                SET {set_clause}
+                WHERE bus_id = %s
+                """,
+                list(photo_paths.values()) + [bus_id]
+            )
+
+            conn.commit()
+
+            return {
+                "message": "Bus photos uploaded successfully",
+                "bus_id": bus_id,
+                **photo_paths
+            }
+
+    except Exception:
+        conn.rollback()
+        raise
+
+    finally:
+        conn.close()
 
 # Admin: Assign a driver to a bus
 @router.put("/buses/{bus_id}/driver")

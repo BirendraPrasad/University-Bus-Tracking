@@ -6,8 +6,20 @@ from backend.app.routers.student import router as student_router
 from backend.app.routers.driver import router as driver_router
 from fastapi.middleware.cors import CORSMiddleware
 from backend.app.routers import trips
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 
 app = FastAPI(title="University Bus Tracking API")
+
+# Bus Photo Storage
+UPLOAD_DIR = Path("backend/uploads/buses")
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+app.mount(
+    "/uploads",
+    StaticFiles(directory="backend/uploads"),
+    name="uploads"
+)
 
 # CORS Configuration
 app.add_middleware(

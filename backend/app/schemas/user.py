@@ -34,11 +34,19 @@ class FacultyCreate(BaseModel):
     password: str
     employee_id: str
     department: str    
+
 class BusCreate(BaseModel):
     bus_number: str
     bus_type: Literal["ROUTE_BUS", "SHUTTLE_BUS"]
     capacity: int
     registration_number: str    
+
+class BusUpdate(BaseModel):
+    bus_number: str | None = None
+    bus_type: Literal["ROUTE_BUS", "SHUTTLE_BUS"] | None = None
+    capacity: int | None = None
+    registration_number: str | None = None
+    
 class RouteCreate(BaseModel):
     route_name: str
     route_code: str
