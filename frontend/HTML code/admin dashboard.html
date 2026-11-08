@@ -98,8 +98,19 @@
       <section class="card"><div class="toolbar" role="search"><div class="field field--search"><label for="bus-search">Search</label><input class="input" id="bus-search" type="search" placeholder="Bus number or registration"></div><div class="field"><label for="bus-type">Bus type</label><select class="select" id="bus-type"><option value="">All types</option><option>ROUTE_BUS</option><option>SHUTTLE_BUS</option></select></div><div class="field"><label for="bus-driver">Driver</label><select class="select" id="bus-driver"><option value="">All drivers</option></select></div></div>
         <div class="table-wrap">
           <table class="data" id="tbl-buses" aria-label="Buses">
-            <thead><tr><th scope="col">Bus number</th><th scope="col">Type</th><th scope="col" class=num>Capacity</th><th scope="col">Registration</th><th scope="col">Driver</th><th scope="col">GPS</th></tr></thead>
-            <tbody></tbody>
+           <thead>
+              <tr>
+                <th>Bus Number</th>
+                <th>Type</th>
+                <th>Capacity</th>
+                <th>Registration</th>
+                <th>Driver</th>
+                <th>GPS</th>
+                <th>Front Photo</th>
+                <th>Side Photo</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
           </table>
         </div>
         <div class="pagination"><span>Showing 0 of 0</span>
@@ -231,20 +242,67 @@
     </div>
   </div>
 
-  <dialog id="dlg-bus" aria-labelledby="dlg-bus-t">
-    <form method="dialog" novalidate>
-      <div class="dialog__head"><h2 id="dlg-bus-t">Add bus</h2>
-        <button class="btn btn--ghost btn--icon" type="button" data-close-dialog aria-label="Close dialog"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
-      <div class="dialog__body">
-        <p class="note">Pending: creating records from the dashboard is not connected yet. This form is a layout preview only.</p>
-        <div class="form-grid"><div class="field"><label for="bus_number">Bus number <span class="req" aria-hidden="true">*</span></label><input class="input" id="bus_number" name="bus_number" type="text" required maxlength="50"></div><div class="field"><label for="bus_type">Bus type <span class="req" aria-hidden="true">*</span></label><select class="select" id="bus_type" name="bus_type" required><option value="">Select type</option><option value="ROUTE_BUS">ROUTE_BUS</option><option value="SHUTTLE_BUS">SHUTTLE_BUS</option></select></div><div class="field"><label for="capacity">Capacity <span class="req" aria-hidden="true">*</span></label><input class="input" id="capacity" name="capacity" type="number" required min="1" step="1" inputmode="numeric"></div><div class="field"><label for="registration_number">Registration number <span class="req" aria-hidden="true">*</span></label><input class="input" id="registration_number" name="registration_number" type="text" required maxlength="50"></div></div>
+  
+<dialog id="dlg-bus" aria-labelledby="dlg-bus-t">
+  <form id="busForm" novalidate>
+    <div class="dialog__head">
+      <h2 id="dlg-bus-t">Add Bus</h2>
+      <button class="btn btn--ghost btn--icon" type="button"
+        data-close-dialog aria-label="Close dialog">✕</button>
+    </div>
+
+    <div class="dialog__body">
+      <p class="note">Enter bus details and upload bus photos.</p>
+
+      <div class="form-grid">
+        <div class="field">
+          <label for="bus_number">Bus Number *</label>
+          <input class="input" id="bus_number" type="text"
+            required maxlength="50">
+        </div>
+
+        <div class="field">
+          <label for="bus_type">Bus Type *</label>
+          <select class="select" id="bus_type" required>
+            <option value="">Select type</option>
+            <option value="ROUTE_BUS">ROUTE_BUS</option>
+            <option value="SHUTTLE_BUS">SHUTTLE_BUS</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="capacity">Capacity *</label>
+          <input class="input" id="capacity" type="number"
+            required min="1">
+        </div>
+
+        <div class="field">
+          <label for="registration_number">Registration Number *</label>
+          <input class="input" id="registration_number"
+            type="text" required maxlength="50">
+        </div>
+
+        <div class="field">
+          <label for="front_photo">Front Photo</label>
+          <input class="input" id="front_photo" type="file"
+            accept=".jpg,.jpeg,.png,.webp">
+        </div>
+
+        <div class="field">
+          <label for="side_photo">Side Photo</label>
+          <input class="input" id="side_photo" type="file"
+            accept=".jpg,.jpeg,.png,.webp">
+        </div>
       </div>
-      <div class="dialog__foot">
-        <button class="btn" type="button" data-close-dialog>Cancel</button>
-        <button class="btn btn--primary" type="submit" disabled aria-disabled="true">Save (pending)</button>
-      </div>
-    </form>
-  </dialog>
+    </div>
+
+    <div class="dialog__foot">
+      <button class="btn" type="button" data-close-dialog>Cancel</button>
+      <button class="btn btn--primary" type="submit">Save Bus</button>
+    </div>
+  </form>
+</dialog>
+
   <dialog id="dlg-driver" aria-labelledby="dlg-driver-t">
     <form id="driverForm" novalidate>
       <div class="dialog__head"><h2 id="dlg-driver-t">Add driver</h2>
@@ -288,30 +346,30 @@
     </form>
   </dialog>
   <dialog id="dlg-route" aria-labelledby="dlg-route-t">
-    <form method="dialog" novalidate>
+    <form id="routeForm" novalidate>
       <div class="dialog__head"><h2 id="dlg-route-t">Add route</h2>
         <button class="btn btn--ghost btn--icon" type="button" data-close-dialog aria-label="Close dialog"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
       <div class="dialog__body">
-        <p class="note">Pending: creating records from the dashboard is not connected yet. This form is a layout preview only.</p>
+        <p class="note">Create a new route and save it to the database.</p>
         <div class="form-grid"><div class="field"><label for="route_name">Route name <span class="req" aria-hidden="true">*</span></label><input class="input" id="route_name" name="route_name" type="text" required maxlength="100"></div><div class="field"><label for="route_code">Route code <span class="req" aria-hidden="true">*</span></label><input class="input" id="route_code" name="route_code" type="text" required maxlength="50"></div><div class="field"><label for="start_point">Start point</label><input class="input" id="start_point" name="start_point" type="text" maxlength="150"></div><div class="field"><label for="end_point">End point</label><input class="input" id="end_point" name="end_point" type="text" maxlength="150"></div><div class="field span-2"><label for="description">Description</label><textarea class="textarea" id="description" name="description" rows="3"></textarea></div></div>
       </div>
       <div class="dialog__foot">
         <button class="btn" type="button" data-close-dialog>Cancel</button>
-        <button class="btn btn--primary" type="submit" disabled aria-disabled="true">Save (pending)</button>
+        <button class="btn btn--primary" type="submit">Save Route</button>
       </div>
     </form>
   </dialog>
   <dialog id="dlg-stop" aria-labelledby="dlg-stop-t">
-    <form method="dialog" novalidate>
+    <form id="stopForm" novalidate>
       <div class="dialog__head"><h2 id="dlg-stop-t">Add stop</h2>
         <button class="btn btn--ghost btn--icon" type="button" data-close-dialog aria-label="Close dialog"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
       <div class="dialog__body">
-        <p class="note">Pending: creating records from the dashboard is not connected yet. This form is a layout preview only.</p>
+        <p class="note">Add a stop to the selected route.</p>
         <div class="form-grid"><div class="field span-2"><label for="stop_route">Route <span class="req" aria-hidden="true">*</span></label><select class="select" id="stop_route" name="stop_route" required><option value="">Pending: not connected yet</option></select></div><div class="field span-2"><label for="stop_name">Stop name <span class="req" aria-hidden="true">*</span></label><input class="input" id="stop_name" name="stop_name" type="text" required maxlength="150"></div><div class="field"><label for="latitude">Latitude <span class="req" aria-hidden="true">*</span></label><input class="input" id="latitude" name="latitude" type="number" required aria-describedby="latitude-hint" min="-90" max="90" step="any"><span class="hint" id="latitude-hint">-90 to 90</span></div><div class="field"><label for="longitude">Longitude <span class="req" aria-hidden="true">*</span></label><input class="input" id="longitude" name="longitude" type="number" required aria-describedby="longitude-hint" min="-180" max="180" step="any"><span class="hint" id="longitude-hint">-180 to 180</span></div><div class="field"><label for="stop_order">Stop order <span class="req" aria-hidden="true">*</span></label><input class="input" id="stop_order" name="stop_order" type="number" required aria-describedby="stop_order-hint" min="1" step="1"><span class="hint" id="stop_order-hint">Must be unique within the route.</span></div></div>
       </div>
       <div class="dialog__foot">
         <button class="btn" type="button" data-close-dialog>Cancel</button>
-        <button class="btn btn--primary" type="submit" disabled aria-disabled="true">Save (pending)</button>
+        <button class="btn btn--primary" type="submit">Save Stop</button>
       </div>
     </form>
   </dialog>

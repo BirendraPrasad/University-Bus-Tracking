@@ -79,3 +79,7 @@ class RegisterRequest(BaseModel):
 
     # Faculty details
     employee_id: str | None = None 
+
+    # Driver details
+    license_number: str | None = None
+    phone: str | None = None

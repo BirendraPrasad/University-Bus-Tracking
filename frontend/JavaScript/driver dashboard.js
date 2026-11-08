@@ -94,8 +94,14 @@ function normalizeTrip(r) {
   return {
     trip_id: pick(r, "trip_id", "id"), trip_date: pick(r, "trip_date", "date"),
     start_time: pick(r, "start_time"), end_time: pick(r, "end_time"), status: status ? String(status).toUpperCase() : null,
-    bus: { bus_number: pick(bus, "bus_number") ?? pick(r, "bus_number"), bus_type: pick(bus, "bus_type") ?? pick(r, "bus_type"),
-      capacity: pick(bus, "capacity") ?? pick(r, "capacity"), registration_number: pick(bus, "registration_number") ?? pick(r, "registration_number") },
+    bus: {
+      bus_number: pick(bus, "bus_number") ?? pick(r, "bus_number"),
+      bus_type: pick(bus, "bus_type") ?? pick(r, "bus_type"),
+      capacity: pick(bus, "capacity") ?? pick(r, "capacity"),
+      registration_number: pick(bus, "registration_number") ?? pick(r, "registration_number"),
+      front_photo: pick(bus, "front_photo") ?? pick(r, "front_photo"),
+      side_photo: pick(bus, "side_photo") ?? pick(r, "side_photo")
+    },    
     route: { route_code: pick(route, "route_code") ?? pick(r, "route_code"), route_name: pick(route, "route_name") ?? pick(r, "route_name"),
       start_point: pick(route, "start_point") ?? pick(r, "start_point"), end_point: pick(route, "end_point") ?? pick(r, "end_point") },
     stops: Array.isArray(r.stops) ? r.stops : null, last_location: r.last_location || null
@@ -112,7 +118,25 @@ function currentTrip() {
   if (sel) return srv && sameId(srv.trip_id, sel.trip_id) ? { ...sel, ...Object.fromEntries(Object.entries(srv).filter(([, v]) => v !== null)) } : sel;
   return srv && sameId(srv.trip_id, state.selectedId) ? srv : null;
 }
-const tripBus = () => { const t = currentTrip(); return (t && t.bus && t.bus.bus_number ? t.bus : null) || (state.profile && state.profile.bus) || null; };
+
+
+const tripBus = () => {
+  const t = currentTrip();
+  const assigned = state.profile?.bus || null;
+  const tripBusData = t?.bus;
+
+  if (tripBusData && tripBusData.bus_number) {
+    return {
+      ...assigned,
+      ...tripBusData,
+      front_photo: tripBusData.front_photo || assigned?.front_photo,
+      side_photo: tripBusData.side_photo || assigned?.side_photo
+    };
+  }
+
+  return assigned;
+};
+
 
 /* ---------- data loading ---------- */
 async function fetchServerTrip() {
@@ -152,14 +176,55 @@ async function initialLoad() {
   }
 }
 
+
+
 /* ---------- rendering ---------- */
 function renderHeader() {
   const p = state.profile;
   setText("hdrName", p.name || "Driver"); setText("hdrRole", p.role || "DRIVER");
   setText("hdrAvatar", (p.name || "D").charAt(0).toUpperCase()); setText("welcomeMsg", `Welcome back, ${p.name || "Driver"}`);
 }
+
+
+
+function renderBusPhotos(bus) {
+  const photos = {
+    front: bus?.front_photo,
+    side: bus?.side_photo
+  };
+
+  Object.entries(photos).forEach(([type, path]) => {
+    document.querySelectorAll(
+      `.bus-photo-item img[data-bus-photo="${type}"]`
+    ).forEach((img) => {
+      const fallback = img.parentElement.querySelector(".photo-fallback");
+
+      if (!path) {
+        img.hidden = true;
+        img.removeAttribute("src");
+        if (fallback) fallback.hidden = false;
+        return;
+      }
+
+      const photoUrl = path.startsWith("http")
+        ? path
+        : `${API_BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
+
+      if (img.src !== photoUrl) {
+        img.src = photoUrl;
+      }
+
+      img.hidden = false;
+      if (fallback) fallback.hidden = true;
+    });
+  });
+}
+
+
 function renderDashboard() {
   const t = currentTrip(), bus = tripBus(), stops = t && t.stops;
+  renderBusPhotos(bus);
+
   setText("cBusNumber", bus ? dash(bus.bus_number) : "No bus assigned");
   setText("cBusMeta", bus ? `${dash(busType(bus.bus_type))} · ${dash(bus.registration_number)}` : "Ask the transport office");
   setText("cRouteCode", t ? dash(t.route.route_code) : "—"); setText("cRouteName", t ? dash(t.route.route_name) : "No trip selected");
@@ -170,11 +235,14 @@ function renderDashboard() {
   setText("cNextStop", "Not available"); setText("cNextSub", "Stop progress is not tracked yet");
   setText("cProgress", stops ? `${stops.length} stops` : "—");
   setText("cProgressSub", stops ? "Total stops. Current and completed stops are not tracked yet." : (t ? "Stop list not available for this trip" : "—"));
+  
   $("dashBus").innerHTML = bus ? row("Bus number", bus.bus_number) + row("Bus type", busType(bus.bus_type)) + row("Registration number", bus.registration_number) +
     row("Capacity", bus.capacity ? `${bus.capacity} seats` : null) + row("Assignment", t ? `Trip #${t.trip_id} · ${statusLabel(t.status)}` : "No trip selected") : emptyMsg("No bus is assigned to you yet.");
 }
 function renderBus() {
   const bus = tripBus(), t = currentTrip();
+  renderBusPhotos(bus);
+
   $("busDetails").innerHTML = bus ? row("Bus number", bus.bus_number) + row("Bus type", busType(bus.bus_type)) + row("Registration number", bus.registration_number) +
     row("Capacity", bus.capacity ? `${bus.capacity} seats` : null) + row("Driver", state.profile.name) +
     row("Current trip", t ? `#${t.trip_id}` : "No trip selected") + row("Bus status", t ? statusLabel(t.status) : "No trip selected") : emptyMsg("No bus is assigned to you yet.");

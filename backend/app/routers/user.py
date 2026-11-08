@@ -574,7 +574,9 @@ def get_buses(
                     bus_type,
                     capacity,
                     registration_number,
-                    driver_id
+                    driver_id,
+                    front_photo,
+                    side_photo
                 FROM buses
                 ORDER BY bus_id
             """)
@@ -588,7 +590,9 @@ def get_buses(
                     "bus_type": bus[2],
                     "capacity": bus[3],
                     "registration_number": bus[4],
-                    "driver_id": bus[5]
+                    "driver_id": bus[5],
+                    "front_photo": bus[6],
+                    "side_photo": bus[7]
                 }
                 for bus in buses
             ]
@@ -1048,3 +1052,276 @@ def create_trip(
 
     finally:
         conn.close()        
+
+
+
+
+# ============================================
+# DRIVER APPROVAL SYSTEM
+# ============================================
+
+
+# Admin: View pending driver requests
+@router.get("/driver-requests")
+def get_driver_requests(
+    current_user: dict = Depends(require_admin)
+):
+    conn = get_connection()
+
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT
+                    r.request_id,
+                    r.user_id,
+                    u.name,
+                    u.email,
+                    r.license_number,
+                    r.phone,
+                    r.status,
+                    r.created_at
+                FROM driver_registration_requests r
+                JOIN users u ON r.user_id = u.user_id
+                WHERE r.status = 'PENDING'
+                ORDER BY r.created_at DESC
+            """)
+
+            requests = cursor.fetchall()
+
+            return [
+                {
+                    "request_id": row[0],
+                    "user_id": row[1],
+                    "name": row[2],
+                    "email": row[3],
+                    "license_number": row[4],
+                    "phone": row[5],
+                    "status": row[6],
+                    "created_at": row[7]
+                }
+                for row in requests
+            ]
+
+    finally:
+        conn.close()
+
+
+# Admin: Approve driver request
+@router.put("/driver-requests/{request_id}/approve")
+def approve_driver_request(
+    request_id: int,
+    current_user: dict = Depends(require_admin)
+):
+    conn = get_connection()
+
+    try:
+        with conn.cursor() as cursor:
+
+            # Lock request to prevent duplicate approval
+            cursor.execute("""
+                SELECT
+                    r.user_id,
+                    r.license_number,
+                    r.phone,
+                    r.status
+                FROM driver_registration_requests r
+                WHERE r.request_id = %s
+                FOR UPDATE
+            """, (request_id,))
+
+            request = cursor.fetchone()
+
+            if not request:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Driver request not found"
+                )
+
+            user_id, license_number, phone, status = request
+
+            if status != "PENDING":
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Request is already {status}"
+                )
+
+            # Check existing license number
+            cursor.execute("""
+                SELECT driver_id
+                FROM drivers
+                WHERE license_number = %s
+            """, (license_number,))
+
+            if cursor.fetchone():
+                raise HTTPException(
+                    status_code=409,
+                    detail="This license number is already registered"
+                )
+
+            # Create driver profile
+            cursor.execute("""
+                INSERT INTO drivers
+                    (user_id, license_number, phone)
+                VALUES (%s, %s, %s)
+                RETURNING driver_id
+            """, (
+                user_id,
+                license_number,
+                phone
+            ))
+
+            driver_id = cursor.fetchone()[0]
+
+            # Activate driver account
+            cursor.execute("""
+                UPDATE users
+                SET is_active = TRUE
+                WHERE user_id = %s
+            """, (user_id,))
+
+            # Update approval request
+            cursor.execute("""
+                UPDATE driver_registration_requests
+                SET
+                    status = 'APPROVED',
+                    reviewed_by = %s,
+                    reviewed_at = CURRENT_TIMESTAMP
+                WHERE request_id = %s
+            """, (
+                current_user["user_id"],
+                request_id
+            ))
+
+            # Notify driver
+            cursor.execute("""
+                INSERT INTO notifications
+                    (user_id, title, message, notification_type)
+                VALUES (%s, %s, %s, %s)
+            """, (
+                user_id,
+                "Driver Registration Approved",
+                "Your driver registration has been approved. You can now login.",
+                "DRIVER_APPROVED"
+            ))
+
+            conn.commit()
+
+            return {
+                "message": "Driver approved successfully",
+                "request_id": request_id,
+                "driver_id": driver_id,
+                "user_id": user_id,
+                "status": "APPROVED"
+            }
+
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception as e:
+        conn.rollback()
+        print("Driver approval error:", e)
+
+        raise HTTPException(
+            status_code=500,
+            detail="Driver approval failed"
+        )
+
+    finally:
+        conn.close()
+
+
+# Admin: Reject driver request
+@router.put("/driver-requests/{request_id}/reject")
+def reject_driver_request(
+    request_id: int,
+    reason: str | None = None,
+    current_user: dict = Depends(require_admin)
+):
+    conn = get_connection()
+
+    try:
+        with conn.cursor() as cursor:
+
+            cursor.execute("""
+                SELECT user_id, status
+                FROM driver_registration_requests
+                WHERE request_id = %s
+                FOR UPDATE
+            """, (request_id,))
+
+            request = cursor.fetchone()
+
+            if not request:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Driver request not found"
+                )
+
+            user_id, status = request
+
+            if status != "PENDING":
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Request is already {status}"
+                )
+
+            # Update request status
+            cursor.execute("""
+                UPDATE driver_registration_requests
+                SET
+                    status = 'REJECTED',
+                    reviewed_by = %s,
+                    reviewed_at = CURRENT_TIMESTAMP,
+                    rejection_reason = %s
+                WHERE request_id = %s
+            """, (
+                current_user["user_id"],
+                reason,
+                request_id
+            ))
+
+            # Keep account inactive
+            cursor.execute("""
+                UPDATE users
+                SET is_active = FALSE
+                WHERE user_id = %s
+            """, (user_id,))
+
+            # Notify driver
+            cursor.execute("""
+                INSERT INTO notifications
+                    (user_id, title, message, notification_type)
+                VALUES (%s, %s, %s, %s)
+            """, (
+                user_id,
+                "Driver Registration Rejected",
+                reason or "Your driver registration request was rejected.",
+                "DRIVER_REJECTED"
+            ))
+
+            conn.commit()
+
+            return {
+                "message": "Driver request rejected",
+                "request_id": request_id,
+                "user_id": user_id,
+                "status": "REJECTED",
+                "reason": reason
+            }
+
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception as e:
+        conn.rollback()
+        print("Driver rejection error:", e)
+
+        raise HTTPException(
+            status_code=500,
+            detail="Driver rejection failed"
+        )
+
+    finally:
+        conn.close()

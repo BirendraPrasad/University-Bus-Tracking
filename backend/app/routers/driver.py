@@ -43,7 +43,8 @@ def _iso(value):
 TRIP_SELECT = """
     SELECT t.trip_id, t.trip_date, t.start_time, t.end_time, t.status,
            b.bus_id, b.bus_number, b.bus_type, b.capacity, b.registration_number,
-           r.route_id, r.route_code, r.route_name, r.start_point, r.end_point
+           r.route_id, r.route_code, r.route_name, r.start_point, r.end_point,
+           b.front_photo, b.side_photo
     FROM trips t
     JOIN buses b ON b.bus_id = t.bus_id
     JOIN routes r ON r.route_id = t.route_id
@@ -52,14 +53,28 @@ TRIP_SELECT = """
 
 def _trip_dict(t):
     return {
-        "trip_id": t[0], "trip_date": str(t[1]),
-        "start_time": _iso(t[2]), "end_time": _iso(t[3]), "status": t[4],
-        "bus": {"bus_id": t[5], "bus_number": t[6], "bus_type": t[7],
-                "capacity": t[8], "registration_number": t[9]},
-        "route": {"route_id": t[10], "route_code": t[11], "route_name": t[12],
-                  "start_point": t[13], "end_point": t[14]},
+        "trip_id": t[0],
+        "trip_date": str(t[1]),
+        "start_time": _iso(t[2]),
+        "end_time": _iso(t[3]),
+        "status": t[4],
+        "bus": {
+            "bus_id": t[5],
+            "bus_number": t[6],
+            "bus_type": t[7],
+            "capacity": t[8],
+            "registration_number": t[9],
+            "front_photo": t[15],
+            "side_photo": t[16]
+        },
+        "route": {
+            "route_id": t[10],
+            "route_code": t[11],
+            "route_name": t[12],
+            "start_point": t[13],
+            "end_point": t[14]
+        }
     }
-
 
 # Driver profile + assigned bus
 @router.get("/me")
@@ -77,8 +92,12 @@ def get_my_profile(current_user: dict = Depends(require_driver)):
             if not d:
                 raise HTTPException(status_code=404, detail="Driver profile not found")
             cur.execute("""
-                SELECT bus_id, bus_number, bus_type, capacity, registration_number
-                FROM buses WHERE driver_id = %s ORDER BY bus_id LIMIT 1
+                SELECT bus_id, bus_number, bus_type, capacity, registration_number,
+                front_photo, side_photo
+                FROM buses
+                WHERE driver_id = %s
+                ORDER BY bus_id
+                LIMIT 1
             """, (d[5],))
             b = cur.fetchone()
             return {
@@ -86,8 +105,14 @@ def get_my_profile(current_user: dict = Depends(require_driver)):
                 "is_active": d[4], "driver_id": d[5],
                 "license_number": d[6], "phone": d[7],
                 "bus": None if not b else {
-                    "bus_id": b[0], "bus_number": b[1], "bus_type": b[2],
-                    "capacity": b[3], "registration_number": b[4]},
+                    "bus_id": b[0],
+                    "bus_number": b[1],
+                    "bus_type": b[2],
+                    "capacity": b[3],
+                    "registration_number": b[4],
+                    "front_photo": b[5],
+                    "side_photo": b[6]
+                },
             }
     finally:
         conn.close()

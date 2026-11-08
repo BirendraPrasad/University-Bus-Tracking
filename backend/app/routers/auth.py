@@ -1,10 +1,10 @@
+
 from fastapi import APIRouter, HTTPException
+
 from backend.app.database.connection import get_connection
-from backend.app.schemas.user import UserLogin,RegisterRequest
-from backend.app.services.security import verify_password
-from backend.app.services.auth import create_access_token
 from backend.app.schemas.user import UserLogin, RegisterRequest
 from backend.app.services.security import verify_password, hash_password
+from backend.app.services.auth import create_access_token
 
 router = APIRouter(
     prefix="/auth",
@@ -12,12 +12,17 @@ router = APIRouter(
 )
 
 
+# ============================================
+# LOGIN
+# ============================================
+
 @router.post("/login")
 def login(user: UserLogin):
     conn = get_connection()
 
     try:
         with conn.cursor() as cursor:
+
             cursor.execute("""
                 SELECT user_id, name, email, password_hash, role, is_active
                 FROM users
@@ -38,6 +43,47 @@ def login(user: UserLogin):
                     detail="Invalid email or password"
                 )
 
+            # Driver approval verification
+            if db_user[4] == "DRIVER":
+
+                cursor.execute("""
+                    SELECT status
+                    FROM driver_registration_requests
+                    WHERE user_id = %s
+                """, (db_user[0],))
+
+                driver_request = cursor.fetchone()
+
+                if driver_request:
+
+                    if driver_request[0] == "PENDING":
+                        raise HTTPException(
+                            status_code=403,
+                            detail="Your driver account is waiting for admin approval"
+                        )
+
+                    if driver_request[0] == "REJECTED":
+                        raise HTTPException(
+                            status_code=403,
+                            detail="Your driver registration has been rejected"
+                        )
+
+                else:
+                    # Preserve Admin-created existing drivers
+                    cursor.execute("""
+                        SELECT driver_id
+                        FROM drivers
+                        WHERE user_id = %s
+                    """, (db_user[0],))
+
+                    existing_driver = cursor.fetchone()
+
+                    if not existing_driver:
+                        raise HTTPException(
+                            status_code=403,
+                            detail="Driver registration request not found"
+                        )
+
             if not db_user[5]:
                 raise HTTPException(
                     status_code=403,
@@ -49,6 +95,25 @@ def login(user: UserLogin):
                 role=db_user[4]
             )
 
+            # Notify all Admin accounts about successful login
+            cursor.execute("""
+                INSERT INTO notifications
+                    (user_id, title, message, notification_type)
+                SELECT
+                    user_id,
+                    %s,
+                    %s,
+                    %s
+                FROM users
+                WHERE role = 'ADMIN'
+            """, (
+                "User Login",
+                f"{db_user[1]} ({db_user[4]}) successfully logged in.",
+                "LOGIN"
+            ))
+
+            conn.commit()
+
             return {
                 "message": "Login successful",
                 "access_token": access_token,
@@ -59,38 +124,36 @@ def login(user: UserLogin):
                 "role": db_user[4]
             }
 
+    except HTTPException:
+        conn.rollback()
+        raise
+
     finally:
         conn.close()
 
-# register 
-# 
+
+# ============================================
+# REGISTER
+# ============================================
+
 @router.post("/register")
 def register(user: RegisterRequest):
 
-    # -----------------------------------------
-    # Validate role
-    # -----------------------------------------
-
-    if user.role in ["DRIVER", "ADMIN"]:
+    # Public Admin registration blocked
+    if user.role == "ADMIN":
         raise HTTPException(
             status_code=403,
-            detail=f"{user.role} accounts cannot be created through public registration"
+            detail="ADMIN accounts cannot be created through public registration"
         )
 
-    # -----------------------------------------
-    # Validate password
-    # -----------------------------------------
-
+    # Password validation
     if len(user.password) < 8:
         raise HTTPException(
             status_code=400,
             detail="Password must contain at least 8 characters"
         )
 
-    # -----------------------------------------
     # Student validation
-    # -----------------------------------------
-
     if user.role == "STUDENT":
 
         if not user.enrollment_no:
@@ -111,10 +174,7 @@ def register(user: RegisterRequest):
                 detail="Semester is required for students"
             )
 
-    # -----------------------------------------
     # Faculty validation
-    # -----------------------------------------
-
     if user.role == "FACULTY":
 
         if not user.employee_id:
@@ -129,9 +189,20 @@ def register(user: RegisterRequest):
                 detail="Department is required for faculty"
             )
 
-    # -----------------------------------------
-    # Database connection
-    # -----------------------------------------
+    # Driver validation
+    if user.role == "DRIVER":
+
+        if not user.license_number:
+            raise HTTPException(
+                status_code=400,
+                detail="License number is required for drivers"
+            )
+
+        if not user.phone:
+            raise HTTPException(
+                status_code=400,
+                detail="Phone number is required for drivers"
+            )
 
     conn = get_connection()
 
@@ -139,130 +210,108 @@ def register(user: RegisterRequest):
 
         with conn.cursor() as cursor:
 
-            # -------------------------------------
             # Check duplicate email
-            # -------------------------------------
-
-            cursor.execute(
-                """
+            cursor.execute("""
                 SELECT user_id
                 FROM users
                 WHERE email = %s
-                """,
-                (user.email,)
-            )
+            """, (user.email,))
 
-            existing_user = cursor.fetchone()
-
-            if existing_user:
-
+            if cursor.fetchone():
                 raise HTTPException(
                     status_code=409,
                     detail="An account with this email already exists"
                 )
 
-            # -------------------------------------
             # Hash password
-            # -------------------------------------
-
             password_hash = hash_password(user.password)
 
-            # -------------------------------------
             # Create user
-            # -------------------------------------
+            # Driver account remains inactive until approval
+            is_active = user.role != "DRIVER"
 
-            cursor.execute(
-                """
+            cursor.execute("""
                 INSERT INTO users
-                (
-                    name,
-                    email,
-                    password_hash,
-                    role
-                )
-                VALUES (%s, %s, %s, %s)
+                    (name, email, password_hash, role, is_active)
+                VALUES (%s, %s, %s, %s, %s)
                 RETURNING user_id, name, email, role
-                """,
-                (
-                    user.name,
-                    user.email,
-                    password_hash,
-                    user.role
-                )
-            )
+            """, (
+                user.name,
+                user.email,
+                password_hash,
+                user.role,
+                is_active
+            ))
 
             created_user = cursor.fetchone()
-
             user_id = created_user[0]
 
-            # -------------------------------------
             # Student record
-            # -------------------------------------
-
             if user.role == "STUDENT":
 
-                cursor.execute(
-                    """
+                cursor.execute("""
                     INSERT INTO students
-                    (
-                        user_id,
-                        enrollment_no,
-                        department,
-                        semester
-                    )
+                        (user_id, enrollment_no, department, semester)
                     VALUES (%s, %s, %s, %s)
                     RETURNING student_id
-                    """,
-                    (
-                        user_id,
-                        user.enrollment_no,
-                        user.department,
-                        user.semester
-                    )
-                )
+                """, (
+                    user_id,
+                    user.enrollment_no,
+                    user.department,
+                    user.semester
+                ))
 
-                student = cursor.fetchone()
+                student_id = cursor.fetchone()[0]
 
-                student_id = student[0]
-
-            # -------------------------------------
             # Faculty record
-            # -------------------------------------
-
             elif user.role == "FACULTY":
 
-                cursor.execute(
-                    """
+                cursor.execute("""
                     INSERT INTO faculty
-                    (
-                        user_id,
-                        employee_id,
-                        department
-                    )
+                        (user_id, employee_id, department)
                     VALUES (%s, %s, %s)
                     RETURNING faculty_id
-                    """,
-                    (
+                """, (
+                    user_id,
+                    user.employee_id,
+                    user.department
+                ))
+
+                faculty_id = cursor.fetchone()[0]
+
+            # Driver registration request
+            elif user.role == "DRIVER":
+
+                cursor.execute("""
+                    INSERT INTO driver_registration_requests
+                        (user_id, license_number, phone, status)
+                    VALUES (%s, %s, %s, 'PENDING')
+                """, (
+                    user_id,
+                    user.license_number,
+                    user.phone
+                ))
+
+                # Notify all Admin accounts
+                cursor.execute("""
+                    INSERT INTO notifications
+                        (user_id, title, message, notification_type)
+                    SELECT
                         user_id,
-                        user.employee_id,
-                        user.department
-                    )
-                )
-
-                faculty = cursor.fetchone()
-
-                faculty_id = faculty[0]
-
-            # -------------------------------------
-            # Commit
-            # -------------------------------------
+                        %s,
+                        %s,
+                        %s
+                    FROM users
+                    WHERE role = 'ADMIN'
+                """, (
+                    "New Driver Registration",
+                    f"{user.name} has submitted a driver registration request.",
+                    "DRIVER_REQUEST"
+                ))
 
             conn.commit()
 
-            # -------------------------------------
-            # Response
-            # -------------------------------------
-
+            # Registration response
             response = {
                 "message": "Registration successful",
                 "user_id": user_id,
@@ -274,8 +323,14 @@ def register(user: RegisterRequest):
             if user.role == "STUDENT":
                 response["student_id"] = student_id
 
-            if user.role == "FACULTY":
+            elif user.role == "FACULTY":
                 response["faculty_id"] = faculty_id
+
+            elif user.role == "DRIVER":
+                response["approval_status"] = "PENDING"
+                response["message"] = (
+                    "Registration submitted. Waiting for admin approval."
+                )
 
             return response
 
@@ -295,5 +350,4 @@ def register(user: RegisterRequest):
         )
 
     finally:
-
-        conn.close()        
+        conn.close()

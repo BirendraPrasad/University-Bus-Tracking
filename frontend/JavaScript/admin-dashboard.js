@@ -171,6 +171,70 @@ function apiPost(path, payload) {
     });
 }
 
+// PUT, DELETE and photo upload API
+function apiMutation(path, method, payload, isFormData) {
+  var ctrl = new AbortController();
+  var timer = setTimeout(function () {
+    ctrl.abort();
+  }, REQUEST_TIMEOUT_MS);
+
+  var headers = {
+    "Accept": "application/json",
+    "Authorization": "Bearer " + auth.token
+  };
+
+  if (!isFormData && payload !== undefined && method !== "DELETE") {
+    headers["Content-Type"] = "application/json";
+  }
+
+  var options = {
+    method: method,
+    headers: headers,
+    signal: ctrl.signal
+  };
+
+  if (payload !== undefined && method !== "DELETE") {
+    options.body = isFormData ? payload : JSON.stringify(payload);
+  }
+
+  return fetch(API_BASE + path, options)
+    .then(function (res) {
+      clearTimeout(timer);
+
+      return res.text().then(function (txt) {
+        var body = null;
+
+        try {
+          body = txt ? JSON.parse(txt) : null;
+        } catch (e) {}
+
+        if (!res.ok) {
+          if (res.status === 401) {
+            clearAuth();
+            goToLogin();
+          }
+
+          throw new ApiError(
+            res.status,
+            detailText(body) || "Request failed (" + res.status + ")."
+          );
+        }
+
+        return body;
+      });
+    })
+    .catch(function (err) {
+      clearTimeout(timer);
+
+      if (err instanceof ApiError) throw err;
+
+      if (err && err.name === "AbortError") {
+        throw new ApiError(0, "Request timed out.");
+      }
+
+      throw new ApiError(0, "Cannot connect to FastAPI server.");
+    });
+}
 
 
   /* ---------------------------------------------------------------- data */
@@ -313,6 +377,24 @@ function apiPost(path, payload) {
   function boolChip(v, yes, no) { return v ? chip(yes, "chip--api") : chip(no, "chip--ph"); }
   function roleChip(role) { return chip(role, role === "ADMIN" ? "chip--blue" : "chip--ph"); }
 
+  function busPhoto(path, label) {
+  if (!path) {
+    return el("span", "cell-muted", "No photo");
+  }
+
+  var img = el("img", "bus-thumb");
+
+  img.src = API_BASE + path;
+  img.alt = label;
+  img.loading = "lazy";
+  img.style.width = "76px";
+  img.style.height = "48px";
+  img.style.objectFit = "cover";
+  img.style.borderRadius = "6px";
+
+  return img;
+}
+
   function stateOf(name) { return function () { return status[name]; }; }
   function errOf(name) { return function () { return errors[name]; }; }
 
@@ -335,28 +417,114 @@ function apiPost(path, payload) {
     ]
   });
 
-  tables.buses = new DataTable({
-    id: "tbl-buses", noun: "buses", search: "bus-search",
-    filters: {
-      "bus-type": function (r, v) { return r.bus_type === v; },
-      "bus-driver": function (r, v) { return v === "none" ? (r.driver_id === null || r.driver_id === undefined) : String(r.driver_id) === v; }
+tables.buses = new DataTable({
+  id: "tbl-buses",
+  noun: "buses",
+  search: "bus-search",
+
+  filters: {
+    "bus-type": function (r, v) {
+      return r.bus_type === v;
     },
-    state: stateOf("buses"), error: errOf("buses"), retry: function () { load("buses"); },
-    rows: function () { return data.buses; },
-    emptyMsg: "No buses have been added to the system.",
-    searchText: function (r) { return textOf(r.bus_number) + " " + textOf(r.registration_number) + " " + textOf(driverName(r.driver_id)); },
-    columns: [
-      { cell: function (r) { return el("span", "cell-main", r.bus_number); } },
-      { cell: function (r) { return r.bus_type; } },
-      { num: true, cell: function (r) { return r.capacity; } },
-      { cell: function (r) { return r.registration_number; } },
-      { cell: function (r) {
-          var n = driverName(r.driver_id);
-          return n === null ? chip("Unassigned", "chip--new") : n;
-        } },
-      { cell: function () { return el("span", "cell-muted", "Pending"); } }
-    ]
-  });
+
+    "bus-driver": function (r, v) {
+      return v === "none"
+        ? (r.driver_id === null || r.driver_id === undefined)
+        : String(r.driver_id) === v;
+    }
+  },
+
+  state: stateOf("buses"),
+  error: errOf("buses"),
+  retry: function () {
+    load("buses");
+  },
+
+  rows: function () {
+    return data.buses;
+  },
+
+  emptyMsg: "No buses have been added to the system.",
+
+  searchText: function (r) {
+    return textOf(r.bus_number) + " " +
+      textOf(r.registration_number) + " " +
+      textOf(driverName(r.driver_id));
+  },
+
+  columns: [
+    {
+      cell: function (r) {
+        return el("span", "cell-main", r.bus_number);
+      }
+    },
+    {
+      cell: function (r) {
+        return r.bus_type;
+      }
+    },
+    {
+      num: true,
+      cell: function (r) {
+        return r.capacity;
+      }
+    },
+    {
+      cell: function (r) {
+        return r.registration_number;
+      }
+    },
+    {
+      cell: function (r) {
+        var n = driverName(r.driver_id);
+        return n === null
+          ? chip("Unassigned", "chip--new")
+          : n;
+      }
+    },
+    {
+      cell: function () {
+        return el("span", "cell-muted", "Pending");
+      }
+    },
+    {
+      cell: function (r) {
+        return busPhoto(r.front_photo, "Front photo");
+      }
+    },
+    {
+      cell: function (r) {
+        return busPhoto(r.side_photo, "Side photo");
+      }
+    },
+    {
+      cell: function (r) {
+        var wrap = el("div", "row-actions");
+
+        var edit = el("button", "btn btn--sm", "Edit");
+        edit.type = "button";
+
+        edit.addEventListener("click", function () {
+          openBusEditor(r);
+        });
+
+        var del = el("button", "btn btn--sm btn--danger", "Delete");
+        del.type = "button";
+
+        del.addEventListener("click", function () {
+          deleteBus(r);
+        });
+
+        wrap.appendChild(edit);
+        wrap.appendChild(del);
+
+        return wrap;
+      }
+    }
+  ]
+});
+
+
 
   tables.drivers = new DataTable({
     id: "tbl-drivers", noun: "drivers", search: "drv-search",
@@ -481,10 +649,49 @@ function apiPost(path, payload) {
     tables.buses.filters["bus-driver"] = sel.value;
   }
 
+
+// Populate Route dropdown in Add Stop form
+function renderStopRouteOptions() {
+  var sel = $("stop_route");
+  if (!sel) return;
+
+  var currentValue = sel.value;
+  var frag = document.createDocumentFragment();
+
+  var placeholder = el("option", null, "Select a route");
+  placeholder.value = "";
+  frag.appendChild(placeholder);
+
+  if (status.routes === "ready" && Array.isArray(data.routes)) {
+    data.routes.forEach(function (route) {
+      var option = el(
+        "option",
+        null,
+        route.route_code + " - " + route.route_name
+      );
+      option.value = String(route.route_id);
+      frag.appendChild(option);
+    });
+  }
+
+  sel.replaceChildren(frag);
+
+  var preferred = selectedRouteId !== null
+    ? String(selectedRouteId)
+    : currentValue;
+
+  if (preferred && sel.querySelector('option[value="' + preferred + '"]')) {
+    sel.value = preferred;
+  }
+}
+
+
+
   /* --------------------------------------------------------------- render */
   function renderAll() {
     renderKpis();
     renderDriverFilter();
+    renderStopRouteOptions();
     Object.keys(tables).forEach(function (k) { tables[k].render(); });
   }
 
@@ -556,6 +763,286 @@ function apiPost(path, payload) {
         });
     });
   }
+
+// ---------------- BUS CRUD AND PHOTO UPLOAD ----------------
+
+var busForm = $("busForm");
+var editingBusId = null;
+
+
+// Open bus form for editing
+function openBusEditor(bus) {
+  editingBusId = bus.bus_id;
+
+  $("dlg-bus-t").textContent = "Edit Bus — " + bus.bus_number;
+
+  $("bus_number").value = bus.bus_number || "";
+  $("bus_type").value = bus.bus_type || "";
+  $("capacity").value = bus.capacity || "";
+  $("registration_number").value = bus.registration_number || "";
+
+  $("front_photo").value = "";
+  $("side_photo").value = "";
+
+  $("dlg-bus").showModal();
+}
+
+
+// Open form for adding a new bus
+document.querySelectorAll('[data-open-dialog="dlg-bus"]').forEach(function (btn) {
+  btn.addEventListener("click", function () {
+    editingBusId = null;
+
+    busForm.reset();
+
+    $("dlg-bus-t").textContent = "Add Bus";
+  });
+});
+
+
+// Upload bus photos
+function uploadBusPhotos(busId) {
+  var front = $("front_photo").files[0];
+  var side = $("side_photo").files[0];
+
+  if (!front && !side) {
+    return Promise.resolve();
+  }
+
+  var formData = new FormData();
+
+  if (front) {
+    formData.append("front_photo", front);
+  }
+
+  if (side) {
+    formData.append("side_photo", side);
+  }
+
+  return apiMutation(
+    "/users/buses/" + busId + "/photos",
+    "POST",
+    formData,
+    true
+  );
+}
+
+
+// Delete bus
+function deleteBus(bus) {
+  if (!confirm("Delete bus " + bus.bus_number + "?")) {
+    return;
+  }
+
+  apiMutation(
+    "/users/buses/" + bus.bus_id,
+    "DELETE"
+  )
+    .then(function () {
+      toast("Bus deleted successfully.", "success");
+      return loadAll();
+    })
+    .catch(function (err) {
+      toast("Could not delete bus: " + err.message, "error");
+    });
+}
+
+
+
+// Add Stop form submission
+var stopForm = $("stopForm");
+
+if (stopForm) {
+  stopForm.addEventListener("submit", function (event) {
+    event.preventDefault();
+
+    if (!stopForm.reportValidity()) return;
+
+    var saveButton = stopForm.querySelector('button[type="submit"]');
+
+    var payload = {
+      route_id: Number($("stop_route").value),
+      stop_name: $("stop_name").value.trim(),
+      latitude: Number($("latitude").value),
+      longitude: Number($("longitude").value),
+      stop_order: Number($("stop_order").value)
+    };
+
+    if (!payload.route_id) {
+      toast("Please select a route.", "error");
+      return;
+    }
+
+    if (
+      !Number.isFinite(payload.latitude) ||
+      payload.latitude < -90 ||
+      payload.latitude > 90 ||
+      !Number.isFinite(payload.longitude) ||
+      payload.longitude < -180 ||
+      payload.longitude > 180 ||
+      !Number.isInteger(payload.stop_order) ||
+      payload.stop_order < 1
+    ) {
+      toast("Please enter valid coordinates and stop order.", "error");
+      return;
+    }
+
+    saveButton.disabled = true;
+    saveButton.textContent = "Saving...";
+
+    apiPost("/users/stops", payload)
+      .then(function (result) {
+        toast(result.message || "Stop created successfully.", "success");
+
+        selectedRouteId = payload.route_id;
+        stopForm.reset();
+
+        var dialog = $("dlg-stop");
+        if (dialog && dialog.open) dialog.close();
+
+        return loadAll();
+      })
+      .catch(function (err) {
+        toast("Could not create stop: " + err.message, "error");
+      })
+      .finally(function () {
+        saveButton.disabled = false;
+        saveButton.textContent = "Save Stop";
+      });
+  });
+}
+
+
+
+  // Add Route form submission
+  var routeForm = $("routeForm");
+
+  if (routeForm) {
+    routeForm.addEventListener("submit", function (event) {
+      event.preventDefault();
+
+      if (!routeForm.reportValidity()) return;
+
+      var saveButton = routeForm.querySelector('button[type="submit"]');
+
+      var payload = {
+        route_name: $("route_name").value.trim(),
+        route_code: $("route_code").value.trim(),
+        start_point: $("start_point").value.trim(),
+        end_point: $("end_point").value.trim(),
+        description: $("description").value.trim()
+      };
+
+      saveButton.disabled = true;
+      saveButton.textContent = "Saving...";
+
+      apiPost("/users/routes", payload)
+        .then(function (result) {
+          toast(result.message || "Route created successfully.", "success");
+
+          selectedRouteId = result.route_id;
+          routeForm.reset();
+
+          var dialog = $("dlg-route");
+          if (dialog && dialog.open) dialog.close();
+
+          return loadAll();
+        })
+        .catch(function (err) {
+          toast("Could not create route: " + err.message, "error");
+        })
+        .finally(function () {
+          saveButton.disabled = false;
+          saveButton.textContent = "Save Route";
+        });
+    });
+  }
+
+
+// Add and Edit Bus form submission
+if (busForm) {
+  busForm.addEventListener("submit", function (event) {
+    event.preventDefault();
+
+    if (!busForm.reportValidity()) {
+      return;
+    }
+
+    var saveButton = busForm.querySelector('button[type="submit"]');
+
+    var payload = {
+      bus_number: $("bus_number").value.trim(),
+      bus_type: $("bus_type").value,
+      capacity: Number($("capacity").value),
+      registration_number: $("registration_number").value.trim()
+    };
+
+    var wasEditing = editingBusId !== null;
+    var busId = editingBusId;
+
+    saveButton.disabled = true;
+    saveButton.textContent = "Saving...";
+
+    var request = wasEditing
+      ? apiMutation(
+          "/users/buses/" + busId,
+          "PUT",
+          payload,
+          false
+        )
+      : apiPost("/users/buses", payload);
+
+    request
+      .then(function (result) {
+        if (wasEditing) {
+          return busId;
+        }
+
+        if (result && (result.bus_id || result.id)) {
+          return result.bus_id || result.id;
+        }
+
+        return load("buses").then(function () {
+          var found = (data.buses || []).find(function (b) {
+            return b.bus_number === payload.bus_number;
+          });
+
+          if (!found) {
+            throw new ApiError(200, "Bus saved but ID not found.");
+          }
+
+          return found.bus_id;
+        });
+      })
+      .then(function (id) {
+        return uploadBusPhotos(id);
+      })
+      .then(function () {
+        toast(
+          wasEditing
+            ? "Bus updated successfully."
+            : "Bus created successfully.",
+          "success"
+        );
+
+        busForm.reset();
+        editingBusId = null;
+
+        $("dlg-bus").close();
+        $("dlg-bus-t").textContent = "Add Bus";
+
+        return loadAll();
+      })
+      .catch(function (err) {
+        toast("Could not save bus: " + err.message, "error");
+      })
+      .finally(function () {
+        saveButton.disabled = false;
+        saveButton.textContent = "Save Bus";
+      });
+  });
+}
+
 
   renderAll();
   loadAll();

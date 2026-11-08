@@ -97,10 +97,21 @@
       <div class="two-col">
         <div class="card bus-card">
           <div class="card-head"><h2>My Bus</h2><button class="btn outline small" type="button" data-open-page="bus">View Bus Details</button></div>
-          <div class="bus-photo">
-            <img src="../photo/bus.jpg" alt="University bus" data-fallback>
-            <span class="photo-fallback" hidden>Bus photo not available</span>
-          </div>
+          
+            <div class="bus-photos">
+              <!-- <div class="bus-photo-item">
+                <h3>Front View</h3>
+                <img alt="Bus front view" data-bus-photo="front" data-fallback hidden>
+                <span class="photo-fallback" hidden>Front photo not available</span>
+              </div> -->
+
+              <div class="bus-photo-item">
+                <h3>Side View</h3>
+                <img alt="Bus side view" data-bus-photo="side" data-fallback hidden>
+                <span class="photo-fallback" hidden>Side photo not available</span>
+              </div>
+            </div>
+
           <div id="dashBus"></div>
         </div>
         <div class="card">
@@ -128,10 +139,20 @@
     <section id="busSection" class="page-section">
       <div class="two-col">
         <div class="card bus-card">
-          <div class="bus-photo tall">
-            <img src="../photo/bus.jpg" alt="University bus" data-fallback>
-            <span class="photo-fallback" hidden>Bus photo not available</span>
-          </div>
+            <div class="bus-photos">
+              <div class="bus-photo-item">
+                <h3>Front View</h3>
+                <img alt="Bus front view" data-bus-photo="front" data-fallback hidden>
+                <span class="photo-fallback" hidden>Front photo not available</span>
+              </div>
+
+              <!-- <div class="bus-photo-item">
+                <h3>Side View</h3>
+                <img alt="Bus side view" data-bus-photo="side" data-fallback hidden>
+                <span class="photo-fallback" hidden>Side photo not available</span>
+              </div> -->
+              
+            </div>
         </div>
         <div class="card"><h2>Bus Information</h2><div id="busDetails"></div></div>
       </div>
