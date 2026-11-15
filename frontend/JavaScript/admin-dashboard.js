@@ -14,7 +14,7 @@
 (function () {
   "use strict";
 
-  var API_BASE = "http://127.0.0.1:8000";   // same base URL the login and driver pages use
+  var API_BASE = window.API_BASE_URL;   // same base URL the login and driver pages use
   var LOGIN_PAGE = "login.html";             // same folder as this page
   var PAGE_SIZE = 10;
   var REQUEST_TIMEOUT_MS = 15000;
@@ -237,11 +237,144 @@ function apiMutation(path, method, payload, isFormData) {
 }
 
 
+
+/* ================= ADMIN NOTIFICATIONS ================= */
+
+var adminNotifications = [];
+var unreadNotificationCount = 0;
+
+function loadNotifications() {
+  return api("/users/notifications")
+    .then(function (result) {
+      adminNotifications = result.notifications || [];
+      unreadNotificationCount = result.unread_count || 0;
+      renderNotifications();
+    })
+    .catch(function (err) {
+      console.error("Notification loading failed:", err);
+    });
+}
+
+function renderNotifications() {
+  var list = $("notificationList");
+  var count = $("notificationCount");
+  var unreadText = $("notificationUnreadText");
+
+  if (!list || !count || !unreadText) return;
+
+  count.textContent = unreadNotificationCount;
+  count.hidden = unreadNotificationCount === 0;
+
+  unreadText.textContent =
+    unreadNotificationCount + " unread notifications";
+
+  list.replaceChildren();
+
+  if (adminNotifications.length === 0) {
+    list.appendChild(el("p", "notification-empty", "No notifications yet."));
+    return;
+  }
+
+  adminNotifications.forEach(function (item) {
+    var card = el(
+      "div",
+      item.is_read ? "notification-item" : "notification-item unread"
+    );
+
+    var title = el("strong", "notification-title", item.title);
+    var message = el("p", "notification-message", item.message);
+    var time = el(
+      "small",
+      "notification-time",
+      new Date(item.created_at).toLocaleString()
+    );
+
+    card.appendChild(title);
+    card.appendChild(message);
+    card.appendChild(time);
+
+    if (!item.is_read) {
+      card.addEventListener("click", function () {
+        apiMutation(
+          "/users/notifications/" + item.notification_id + "/read",
+          "PATCH"
+        ).then(function () {
+          return loadNotifications();
+        }).catch(function (err) {
+          toast("Could not mark notification as read: " + err.message, "error");
+        });
+      });
+    }
+
+    list.appendChild(card);
+  });
+}
+
+// Mark All as Read button
+var markAllBtn = el("button", "mark-all-notifications", "Mark All as Read");
+
+markAllBtn.type = "button";
+markAllBtn.addEventListener("click", function () {
+  apiMutation("/users/notifications/read-all", "PATCH")
+    .then(function () {
+      return loadNotifications();
+    })
+    .catch(function (err) {
+      toast("Could not mark notifications as read: " + err.message, "error");
+    });
+});
+
+var notificationPanel = $("notificationPanel");
+
+if (notificationPanel) {
+  notificationPanel.insertBefore(
+    markAllBtn,
+    notificationPanel.firstChild
+  );
+}
+
+
   /* ---------------------------------------------------------------- data */
-  var data = { users: null, buses: null, drivers: null, routes: null };
-  var status = { users: "idle", buses: "idle", drivers: "idle", routes: "idle" };
-  var errors = { users: "", buses: "", drivers: "", routes: "" };
-  var PATHS = { users: "/users/", buses: "/users/buses", drivers: "/users/drivers", routes: "/users/routes" };
+ var data = {
+    users: null,
+    buses: null,
+    drivers: null,
+    routes: null,
+    faculty: null,
+    students: null,
+    trips: null
+};
+
+var status = {
+    users: "idle",
+    buses: "idle",
+    drivers: "idle",
+    routes: "idle",
+    faculty: "idle",
+    students: "idle",
+    trips: "idle"
+};
+
+var errors = {
+    users: "",
+    buses: "",
+    drivers: "",
+    routes: "",
+    faculty: "",
+    students: "",
+    trips: ""
+};
+
+var PATHS = {
+    users: "/users/",
+    buses: "/users/buses",
+    drivers: "/users/drivers",
+    routes: "/users/routes",
+    faculty: "/users/faculty",
+    students: "/users/students",
+    trips: "/trips/"
+};
+
 
   function load(name) {
     status[name] = "loading"; errors[name] = "";
@@ -401,21 +534,538 @@ function apiMutation(path, method, payload, isFormData) {
   /* -------------------------------------------------------- table configs */
   var tables = {};
 
-  tables.users = new DataTable({
-    id: "tbl-users", noun: "users", search: "usr-search",
-    filters: { "usr-role": function (r, v) { return r.role === v; } },
-    state: stateOf("users"), error: errOf("users"), retry: function () { load("users"); },
-    rows: function () { return data.users; },
+
+// ================= USERS TABLE =================
+
+tables.users = new DataTable({
+    id: "tbl-users",
+    noun: "users",
+    search: "usr-search",
+
+    filters: {
+        "usr-role": function (r, v) {
+            return r.role === v;
+        }
+    },
+
+    state: stateOf("users"),
+    error: errOf("users"),
+
+    retry: function () {
+        load("users");
+    },
+
+    rows: function () {
+        return data.users;
+    },
+
     emptyMsg: "The users table has no accounts.",
-    searchText: function (r) { return textOf(r.name) + " " + textOf(r.email); },
+
+    searchText: function (r) {
+        return textOf(r.name) + " " + textOf(r.email);
+    },
+
     columns: [
-      { num: true, cell: function (r) { return r.user_id; } },
-      { cell: function (r) { return el("span", "cell-main", textOf(r.name) || "—"); } },
-      { cell: function (r) { return r.email; } },
-      { cell: function (r) { return roleChip(r.role); } },
-      { cell: function (r) { return boolChip(r.is_active, "Active", "Inactive"); } }
+        {
+            num: true,
+            cell: function (r) {
+                return r.user_id;
+            }
+        },
+        {
+            cell: function (r) {
+                return el("span", "cell-main", textOf(r.name) || "—");
+            }
+        },
+        {
+            cell: function (r) {
+                return r.email;
+            }
+        },
+        {
+            cell: function (r) {
+                return roleChip(r.role);
+            }
+        },
+
+       {
+          cell: function (r) {
+              return boolChip(r.is_active, "Active", "Inactive");
+          }
+        },
+       {
+          cell: function (r) {
+           var wrap = el("div", "row-actions");
+
+              // Edit Button
+             var edit = el("button", "btn btn--sm", "Edit");
+              edit.type = "button";
+
+              edit.addEventListener("click", function () {
+                  openUserEditor(r);
+              });
+
+              // Activate / Deactivate Button
+              var toggle = el(
+                  "button",
+                  "btn btn--sm",
+                  r.is_active ? "Deactivate" : "Activate"
+              );
+              toggle.type = "button";
+
+              toggle.addEventListener("click", function () {
+                  changeUserStatus(r);
+              });
+
+              wrap.appendChild(edit);
+              wrap.appendChild(toggle);
+
+               return wrap;
+      }
+  }
+
+]
+});
+
+
+// ================= OPEN USER EDITOR =================
+
+function openUserEditor(user) {
+    $("edit_user_id").value = user.user_id;
+    $("edit_user_role").value = user.role;
+
+    $("edit_name").value = user.name || "";
+    $("edit_email").value = user.email || "";
+
+    // Hide all role-specific fields first
+    $("edit-driver-fields").hidden = true;
+    $("edit-driver-phone-field").hidden = true;
+    $("edit-student-fields").hidden = true;
+    $("edit-student-dept-field").hidden = true;
+    $("edit-student-sem-field").hidden = true;
+    $("edit-faculty-fields").hidden = true;
+    $("edit-faculty-dept-field").hidden = true;
+
+    if (user.role === "DRIVER") {
+        var driver = (data.drivers || []).find(function (r) {
+            return r.user_id === user.user_id;
+        });
+
+        if (driver) {
+            $("edit-driver-fields").hidden = false;
+            $("edit-driver-phone-field").hidden = false;
+            $("edit_license").value = driver.license_number || "";
+            $("edit_phone").value = driver.phone || "";
+        }
+
+    } else if (user.role === "STUDENT") {
+        var student = (data.students || []).find(function (r) {
+            return r.user_id === user.user_id;
+        });
+
+        if (student) {
+            $("edit-student-fields").hidden = false;
+            $("edit-student-dept-field").hidden = false;
+            $("edit-student-sem-field").hidden = false;
+            $("edit_enrollment").value = student.enrollment_no || "";
+            $("edit_student_department").value = student.department || "";
+            $("edit_semester").value = student.semester || "";
+        }
+
+    } else if (user.role === "FACULTY") {
+        var faculty = (data.faculty || []).find(function (r) {
+            return r.user_id === user.user_id;
+        });
+
+        if (faculty) {
+            $("edit-faculty-fields").hidden = false;
+            $("edit-faculty-dept-field").hidden = false;
+            $("edit_employee").value = faculty.employee_id || "";
+            $("edit_faculty_department").value = faculty.department || "";
+        }
+    }
+
+    $("dlg-user-edit").showModal();
+}
+
+
+ // ================= UPDATE USER =================
+
+var editUserForm = $("editUserForm");
+
+if (editUserForm) {
+    editUserForm.addEventListener("submit", function (event) {
+        event.preventDefault();
+
+        if (!editUserForm.reportValidity()) return;
+
+        var userId = $("edit_user_id").value;
+        var role = $("edit_user_role").value;
+
+        var payload = {
+            name: $("edit_name").value.trim(),
+            email: $("edit_email").value.trim()
+        };
+
+        if (role === "DRIVER") {
+            payload.license_number = $("edit_license").value.trim();
+            payload.phone = $("edit_phone").value.trim();
+        }
+
+        if (role === "STUDENT") {
+            payload.enrollment_no = $("edit_enrollment").value.trim();
+            payload.department = $("edit_student_department").value.trim();
+            payload.semester = Number($("edit_semester").value);
+        }
+
+        if (role === "FACULTY") {
+            payload.employee_id = $("edit_employee").value.trim();
+            payload.department = $("edit_faculty_department").value.trim();
+        }
+
+        var saveButton = editUserForm.querySelector('button[type="submit"]');
+        saveButton.disabled = true;
+        saveButton.textContent = "Updating...";
+
+        apiMutation(
+            "/users/" + encodeURIComponent(userId),
+            "PUT",
+            payload,
+            false
+        )
+        .then(function (result) {
+            toast(result.message || "User updated successfully.", "success");
+            $("dlg-user-edit").close();
+            return loadAll();
+        })
+        .catch(function (err) {
+            toast("Could not update user: " + err.message, "error");
+        })
+        .finally(function () {
+            saveButton.disabled = false;
+            saveButton.textContent = "Update User";
+        });
+    });
+}
+
+
+// ================= USER ACTIVATE / DEACTIVATE =================
+
+function changeUserStatus(user) {
+    var nextStatus = !user.is_active;
+
+    var action = nextStatus ? "Activate" : "Deactivate";
+
+    if (!confirm(action + " user " + user.name + "?")) {
+        return;
+    }
+
+    apiMutation(
+        "/users/" + encodeURIComponent(user.user_id) + "/status",
+        "PATCH",
+        {
+            is_active: nextStatus
+        },
+        false
+    )
+    .then(function (result) {
+        toast(
+            result.message || "User status updated successfully.",
+            "success"
+        );
+
+        return loadAll();
+    })
+    .catch(function (err) {
+        toast(
+            "Could not update user status: " + err.message,
+            "error"
+        );
+    });
+}
+
+
+
+// ================= DRIVER REGISTRATION APPROVAL =================
+
+var pendingDriverRequests = [];
+
+function loadDriverRequests() {
+    var tbody = $("pendingDriverRequestsBody");
+
+    if (!tbody) return;
+
+    tbody.replaceChildren();
+
+    var loadingRow = el("tr");
+    var loadingCell = el("td", null, "Loading requests...");
+    loadingCell.colSpan = 7;
+    loadingRow.appendChild(loadingCell);
+    tbody.appendChild(loadingRow);
+
+    return api("/users/driver-requests")
+        .then(function (result) {
+
+            // API may return an array or an object containing requests
+            pendingDriverRequests = Array.isArray(result)
+                ? result
+                : (result.requests || []);
+
+            renderDriverRequests();
+        })
+        .catch(function (err) {
+            tbody.replaceChildren();
+
+            var row = el("tr");
+            var cell = el(
+                "td",
+                null,
+                "Could not load requests: " + err.message
+            );
+
+            cell.colSpan = 7;
+            row.appendChild(cell);
+            tbody.appendChild(row);
+        });
+}
+
+
+function renderDriverRequests() {
+    var tbody = $("pendingDriverRequestsBody");
+
+    if (!tbody) return;
+
+    tbody.replaceChildren();
+
+    if (pendingDriverRequests.length === 0) {
+        var row = el("tr");
+        var cell = el("td", null, "No pending driver requests.");
+        cell.colSpan = 7;
+        row.appendChild(cell);
+        tbody.appendChild(row);
+        return;
+    }
+
+    pendingDriverRequests.forEach(function (request) {
+
+        var row = el("tr");
+
+        row.appendChild(el("td", null, request.name || "—"));
+        row.appendChild(el("td", null, request.email || "—"));
+        row.appendChild(el("td", null, request.license_number || "—"));
+        row.appendChild(el("td", null, request.phone || "—"));
+
+        var requestDate = request.created_at
+            ? new Date(request.created_at).toLocaleString()
+            : "—";
+
+        row.appendChild(el("td", null, requestDate));
+        row.appendChild(el("td", null, request.status || "PENDING"));
+
+        var actionsCell = el("td");
+        var actions = el("div", "row-actions");
+
+        var approveBtn = el("button", "btn btn--sm", "Approve");
+        approveBtn.type = "button";
+
+        approveBtn.addEventListener("click", function () {
+            updateDriverRequest(request, "approve", approveBtn);
+        });
+
+        var rejectBtn = el("button", "btn btn--sm btn--danger", "Reject");
+        rejectBtn.type = "button";
+
+        rejectBtn.addEventListener("click", function () {
+            updateDriverRequest(request, "reject", rejectBtn);
+        });
+
+        actions.appendChild(approveBtn);
+        actions.appendChild(rejectBtn);
+
+        actionsCell.appendChild(actions);
+        row.appendChild(actionsCell);
+
+        tbody.appendChild(row);
+    });
+}
+
+
+// Approve or Reject Driver Registration
+function updateDriverRequest(request, action, button) {
+
+    var requestId = request.request_id;
+
+    if (!requestId) {
+        toast("Request ID is missing.", "error");
+        return;
+    }
+
+    if (action === "reject") {
+        if (!confirm("Are you sure you want to reject this driver request?")) {
+            return;
+        }
+    }
+
+    button.disabled = true;
+    button.textContent = "Processing...";
+
+    apiMutation(
+       "/users/driver-requests/" + encodeURIComponent(requestId) + "/" + action,
+        "PUT"
+    )
+    .then(function (result) {
+
+        toast(
+            result.message ||
+            "Driver request " + action + "d successfully.",
+            "success"
+        );
+
+        return Promise.all([
+            loadDriverRequests(),
+            action === "approve" ? load("drivers") : Promise.resolve()
+        ]);
+    })
+    .catch(function (err) {
+        toast(
+            "Could not " + action + " driver request: " + err.message,
+            "error"
+        );
+
+        button.disabled = false;
+        button.textContent = action === "approve" ? "Approve" : "Reject";
+    });
+}
+
+
+// Refresh Pending Driver Requests
+var refreshDriverRequestsBtn = $("refreshDriverRequestsBtn");
+
+if (refreshDriverRequestsBtn) {
+    refreshDriverRequestsBtn.addEventListener("click", function () {
+        refreshDriverRequestsBtn.disabled = true;
+
+        loadDriverRequests()
+            .finally(function () {
+                refreshDriverRequestsBtn.disabled = false;
+            });
+    });
+}
+
+
+  // ================= FACULTY TABLE =================
+
+tables.faculty = new DataTable({
+    id: "tbl-faculty",
+    noun: "faculty members",
+    search: "fac-search",
+
+    filters: {
+        "fac-dept": function (row, value) {
+            return row.department === value;
+        }
+    },
+
+    state: stateOf("faculty"),
+    error: errOf("faculty"),
+
+    retry: function () {
+        load("faculty");
+    },
+
+    rows: function () {
+        return data.faculty || [];
+    },
+
+    emptyMsg: "No faculty members are registered.",
+
+    searchText: function (row) {
+        return textOf(row.name) + " " +
+            textOf(row.email) + " " +
+            textOf(row.employee_id) + " " +
+            textOf(row.department);
+    },
+
+    columns: [
+        { cell: function (row) {
+            return el("span", "cell-main", textOf(row.name) || "—");
+        }},
+        { cell: function (row) {
+            return textOf(row.email) || "—";
+        }},
+        { cell: function (row) {
+            return textOf(row.employee_id) || "—";
+        }},
+        { cell: function (row) {
+            return textOf(row.department) || "—";
+        }},
+        { cell: function (row) {
+            return boolChip(row.is_active, "Active", "Inactive");
+        }}
     ]
-  });
+});
+
+
+// ================= STUDENTS TABLE =================
+
+tables.students = new DataTable({
+    id: "tbl-students",
+    noun: "students",
+    search: "stu-search",
+
+    filters: {
+        "stu-dept": function (row, value) {
+            return row.department === value;
+        },
+        "stu-sem": function (row, value) {
+            return String(row.semester) === value;
+        }
+    },
+
+    state: stateOf("students"),
+    error: errOf("students"),
+
+    retry: function () {
+        load("students");
+    },
+
+    rows: function () {
+        return data.students || [];
+    },
+
+    emptyMsg: "No students are registered.",
+
+    searchText: function (row) {
+        return textOf(row.name) + " " +
+            textOf(row.email) + " " +
+            textOf(row.enrollment_no) + " " +
+            textOf(row.department) + " " +
+            textOf(row.semester);
+    },
+
+    columns: [
+        { cell: function (row) {
+            return el("span", "cell-main", textOf(row.name) || "—");
+        }},
+        { cell: function (row) {
+            return textOf(row.email) || "—";
+        }},
+        { cell: function (row) {
+            return textOf(row.enrollment_no) || "—";
+        }},
+        { cell: function (row) {
+            return textOf(row.department) || "—";
+        }},
+        { cell: function (row) {
+            return textOf(row.semester) || "—";
+        }},
+        { cell: function (row) {
+            return boolChip(row.is_active, "Active", "Inactive");
+        }}
+    ]
+});
+
+
 
 tables.buses = new DataTable({
   id: "tbl-buses",
@@ -461,6 +1111,13 @@ tables.buses = new DataTable({
     {
       cell: function (r) {
         return r.bus_type;
+      }
+    },
+    {
+      cell: function (r) {
+        return r.route_code
+          ? r.route_code + " - " + (r.route_name || "")
+          : chip("Not assigned", "chip--new");
       }
     },
     {
@@ -545,7 +1202,96 @@ tables.buses = new DataTable({
     ]
   });
 
+
+// ================= TRIPS TABLE =================
+
+tables.trips = new DataTable({
+  id: "tbl-trips",
+  noun: "trips",
+  search: "trip-search",
+
+  filters: {
+    "trip-status": function (row, value) {
+      return row.status === value;
+    },
+    "trip-date": function (row, value) {
+      return String(row.trip_date).slice(0, 10) === value;
+    }
+  },
+
+  state: stateOf("trips"),
+  error: errOf("trips"),
+
+  retry: function () {
+    load("trips");
+  },
+
+  rows: function () {
+    return data.trips || [];
+  },
+
+  emptyMsg: "No trips have been created yet.",
+
+ searchText: function (row) {
+    return [
+        row.trip_id,
+        row.bus_number,
+        row.route_name,
+        row.route_code,
+        row.driver_name,
+        row.status
+    ].map(textOf).join(" ");
+},
+
+  columns: [
+    {
+      num: true,
+      cell: function (row) {
+        return "TRIP-" + row.trip_id;
+      }
+    },
+    {
+      cell: function (row) {
+        return row.bus_number || "—";
+      }
+    },
+    {
+      cell: function (row) {
+        return row.route_code + " - " + row.route_name;
+      }
+    },
+    {
+      cell: function (row) {
+        return row.driver_name || "—";
+      }
+    },
+    {
+      cell: function (row) {
+        return row.trip_date
+          ? new Date(row.trip_date + "T00:00:00").toLocaleDateString("en-IN")
+          : "—";
+      }
+    },
+    {
+      cell: function (row) {
+        var cls = row.status === "COMPLETED"
+          ? "chip--api"
+          : row.status === "ACTIVE"
+          ? "chip--blue"
+          : row.status === "SCHEDULED"
+          ? "chip--new"
+          : "chip--ph";
+
+        return chip(row.status, cls);
+      }
+    }
+  ]
+});
+
+
   var selectedRouteId = null;
+  var editingRouteId = null;
+  var editingStopId = null;
   tables.routes = new DataTable({
     id: "tbl-routes", noun: "routes", search: "rt-search",
     state: stateOf("routes"), error: errOf("routes"), retry: function () { load("routes"); },
@@ -560,10 +1306,21 @@ tables.buses = new DataTable({
       { cell: function (r) { return r.end_point; } },
       { cell: function (r) { return boolChip(r.is_active, "Active", "Inactive"); } },
       { cell: function (r) {
-          var b = el("button", "btn btn--sm", "View stops"); b.type = "button";
-          b.setAttribute("aria-label", "View stops for route " + textOf(r.route_code));
-          b.addEventListener("click", function () { loadStops(r); });
-          var w = el("div", "row-actions"); w.appendChild(b); return w;
+          var w = el("div", "row-actions");
+          var view = el("button", "btn btn--sm", "View stops");
+          view.type = "button";
+          view.addEventListener("click", function () { loadStops(r); });
+
+          var edit = el("button", "btn btn--sm", "Edit");
+          edit.type = "button";
+          edit.addEventListener("click", function () { openRouteEditor(r); });
+
+          var del = el("button", "btn btn--sm", "Delete");
+          del.type = "button";
+          del.addEventListener("click", function () { deleteRoute(r); });
+
+          w.append(view, edit, del);
+          return w;
         } }
     ]
   });
@@ -582,7 +1339,22 @@ tables.buses = new DataTable({
       { num: true, cell: function (r) { return r.stop_order; } },
       { cell: function (r) { return el("span", "cell-main", r.stop_name); } },
       { num: true, cell: function (r) { return r.latitude; } },
-      { num: true, cell: function (r) { return r.longitude; } }
+      { num: true, cell: function (r) { return r.longitude; } },
+      { cell: function (r) { return r.pickup_time || "—"; } },
+      { cell: function (r) { return r.drop_time || "—"; } },
+      { cell: function (r) {
+          var w = el("div", "row-actions");
+          var edit = el("button", "btn btn--sm", "Edit");
+          edit.type = "button";
+          edit.addEventListener("click", function () { openStopEditor(r); });
+
+          var del = el("button", "btn btn--sm", "Delete");
+          del.type = "button";
+          del.addEventListener("click", function () { deleteStop(r); });
+
+          w.append(edit, del);
+          return w;
+        } }
     ]
   });
   function findRoute(id) {
@@ -650,6 +1422,70 @@ tables.buses = new DataTable({
   }
 
 
+// Populate Faculty and Students filters from API data
+var peopleFilterOptionsKey = "";
+
+function renderPeopleFilters() {
+    
+  var facultyDept = $("fac-dept");
+    var studentDept = $("stu-dept");
+    var studentSem = $("stu-sem");
+
+    if (!facultyDept || !studentDept || !studentSem) return;
+
+    var facultyRows = status.faculty === "ready" ? data.faculty || [] : [];
+    var studentRows = status.students === "ready" ? data.students || [] : [];
+
+    var key = JSON.stringify({
+        faculty: facultyRows.map(function (r) { return r.department; }),
+        studentDept: studentRows.map(function (r) { return r.department; }),
+        semester: studentRows.map(function (r) { return r.semester; })
+    });
+
+    if (key === peopleFilterOptionsKey) return;
+    peopleFilterOptionsKey = key;
+
+    function fillSelect(select, firstLabel, values, currentValue) {
+        var frag = document.createDocumentFragment();
+        var first = el("option", null, firstLabel);
+        first.value = "";
+        frag.appendChild(first);
+
+        values.forEach(function (value) {
+            var option = el("option", null, String(value));
+            option.value = String(value);
+            frag.appendChild(option);
+        });
+
+        select.replaceChildren(frag);
+        select.value = values.map(String).indexOf(currentValue) !== -1
+            ? currentValue
+            : "";
+    }
+
+    var facultyDepartments = [...new Set(
+        facultyRows.map(function (r) { return r.department; }).filter(Boolean)
+    )].sort();
+
+    var studentDepartments = [...new Set(
+        studentRows.map(function (r) { return r.department; }).filter(Boolean)
+    )].sort();
+
+    var semesters = [...new Set(
+        studentRows.map(function (r) { return r.semester; })
+            .filter(function (v) { return v !== null && v !== undefined; })
+    )].sort(function (a, b) { return Number(a) - Number(b); });
+
+    fillSelect(facultyDept, "All departments", facultyDepartments, facultyDept.value);
+    fillSelect(studentDept, "All departments", studentDepartments, studentDept.value);
+    fillSelect(studentSem, "All semesters", semesters, studentSem.value);
+
+    tables.faculty.filters["fac-dept"] = facultyDept.value;
+    tables.students.filters["stu-dept"] = studentDept.value;
+    tables.students.filters["stu-sem"] = studentSem.value;
+}  
+
+
 // Populate Route dropdown in Add Stop form
 function renderStopRouteOptions() {
   var sel = $("stop_route");
@@ -687,13 +1523,159 @@ function renderStopRouteOptions() {
 
 
 
-  /* --------------------------------------------------------------- render */
-  function renderAll() {
-    renderKpis();
-    renderDriverFilter();
-    renderStopRouteOptions();
-    Object.keys(tables).forEach(function (k) { tables[k].render(); });
+
+// Populate Assigned Route dropdown for Add/Edit Bus
+function renderBusRouteOptions(preferredValue) {
+  var sel = $("bus_route");
+  var typeSelect = $("bus_type");
+  if (!sel || !typeSelect) return;
+
+  var currentValue = preferredValue !== undefined
+    ? String(preferredValue || "")
+    : sel.value;
+
+  var busType = typeSelect.value;
+
+  var allowedCodes = busType === "ROUTE_BUS"
+    ? ["R001", "R002", "R003", "R004", "R005", "R006"]
+    : busType === "SHUTTLE_BUS"
+      ? ["R007", "R008"]
+      : [];
+
+  var frag = document.createDocumentFragment();
+  var placeholder = el("option", null, "Select a route");
+  placeholder.value = "";
+  frag.appendChild(placeholder);
+
+  if (status.routes === "ready" && Array.isArray(data.routes)) {
+    data.routes.forEach(function (route) {
+      if (!route.is_active || !allowedCodes.includes(route.route_code)) return;
+
+      var option = el(
+        "option",
+        null,
+        route.route_code + " - " + route.route_name
+      );
+      option.value = String(route.route_id);
+      frag.appendChild(option);
+    });
   }
+
+  sel.replaceChildren(frag);
+
+  if (currentValue && sel.querySelector('option[value="' + currentValue + '"]')) {
+    sel.value = currentValue;
+  } else {
+    sel.value = "";
+  }
+}
+
+
+// Populate Create Trip dropdowns
+function renderTripOptions() {
+  var busSelect = $("trip_bus");
+  var routeSelect = $("trip_route");
+  var driverSelect = $("trip_driver");
+
+  if (!busSelect || !routeSelect || !driverSelect) return;
+
+  // Bus dropdown
+  var busFrag = document.createDocumentFragment();
+  var busPlaceholder = el("option", null, "Select Bus");
+  busPlaceholder.value = "";
+  busFrag.appendChild(busPlaceholder);
+
+  if (status.buses === "ready" && Array.isArray(data.buses)) {
+    data.buses.forEach(function (bus) {
+      if (bus.driver_id === null || bus.driver_id === undefined) return;
+
+      var option = el("option", null, bus.bus_number);
+      option.value = String(bus.bus_id);
+      busFrag.appendChild(option);
+    });
+  }
+
+  var oldBus = busSelect.value;
+  busSelect.replaceChildren(busFrag);
+
+  if (oldBus && busSelect.querySelector('option[value="' + oldBus + '"]')) {
+    busSelect.value = oldBus;
+  }
+
+  // Route dropdown
+  var routeFrag = document.createDocumentFragment();
+  var routePlaceholder = el("option", null, "Select Active Route");
+  routePlaceholder.value = "";
+  routeFrag.appendChild(routePlaceholder);
+
+  if (status.routes === "ready" && Array.isArray(data.routes)) {
+    data.routes.forEach(function (route) {
+      if (route.is_active !== true) return;
+
+      var option = el(
+        "option",
+        null,
+        route.route_code + " - " + route.route_name
+      );
+      option.value = String(route.route_id);
+      routeFrag.appendChild(option);
+    });
+  }
+
+  var oldRoute = routeSelect.value;
+  routeSelect.replaceChildren(routeFrag);
+
+  if (oldRoute && routeSelect.querySelector('option[value="' + oldRoute + '"]')) {
+    routeSelect.value = oldRoute;
+  }
+
+  // Driver dropdown follows selected bus
+  updateTripDriver();
+}
+
+function updateTripDriver() {
+  var busSelect = $("trip_bus");
+  var driverSelect = $("trip_driver");
+
+  if (!busSelect || !driverSelect) return;
+
+  driverSelect.replaceChildren();
+
+  var placeholder = el("option", null, "Select a bus first");
+  placeholder.value = "";
+  driverSelect.appendChild(placeholder);
+
+  var selectedBus = (data.buses || []).find(function (bus) {
+    return String(bus.bus_id) === busSelect.value;
+  });
+
+  if (!selectedBus || selectedBus.driver_id == null) return;
+
+  var assignedDriver = (data.drivers || []).find(function (driver) {
+    return String(driver.driver_id) === String(selectedBus.driver_id);
+  });
+
+  if (!assignedDriver) {
+    placeholder.textContent = "Assigned driver not found";
+    return;
+  }
+
+  var option = el("option", null, assignedDriver.name);
+  option.value = String(assignedDriver.driver_id);
+  driverSelect.appendChild(option);
+  driverSelect.value = option.value;
+}
+
+  /* --------------------------------------------------------------- render */
+function renderAll() {
+  renderKpis();
+  renderDriverFilter();
+  renderPeopleFilters();
+  renderStopRouteOptions();
+  renderBusRouteOptions();
+  renderTripOptions();
+  Object.keys(tables).forEach(function (k) { tables[k].render(); });
+}
 
   /* ----------------------------------------------------------- user chip */
   var name = auth.name || "Administrator";
@@ -720,6 +1702,14 @@ function renderStopRouteOptions() {
     loadAll().then(function (failed) { if (!failed) { toast("Data refreshed.", "success"); } });
   });
 
+
+
+  // Update assigned driver when bus changes
+var tripBusSelect = $("trip_bus");
+
+if (tripBusSelect) {
+  tripBusSelect.addEventListener("change", updateTripDriver);
+}
 
 
     // Add Driver form submission
@@ -764,6 +1754,94 @@ function renderStopRouteOptions() {
     });
   }
 
+
+  // Add Student form submission
+  var studentForm = $("studentForm");
+
+  if (studentForm) {
+    studentForm.addEventListener("submit", function (event) {
+      event.preventDefault();
+
+      if (!studentForm.reportValidity()) return;
+
+      var saveButton = studentForm.querySelector('button[type="submit"]');
+
+      var payload = {
+        name: $("s_name").value.trim(),
+        email: $("s_email").value.trim(),
+        password: $("s_password").value,
+        enrollment_no: $("enrollment_no").value.trim(),
+        department: $("s_department").value.trim(),
+        semester: Number($("semester").value)
+      };
+
+      saveButton.disabled = true;
+      saveButton.textContent = "Saving...";
+
+      apiPost("/users/students", payload)
+        .then(function (result) {
+          toast(result.message || "Student created successfully.", "success");
+          studentForm.reset();
+
+          var dialog = $("dlg-student");
+          if (dialog && dialog.open) dialog.close();
+
+          return loadAll();
+        })
+        .catch(function (err) {
+          toast("Could not create student: " + err.message, "error");
+        })
+        .finally(function () {
+          saveButton.disabled = false;
+          saveButton.textContent = "Save Student";
+        });
+    });
+  }
+
+
+  // Add Faculty form submission
+  var facultyForm = $("facultyForm");
+
+  if (facultyForm) {
+    facultyForm.addEventListener("submit", function (event) {
+      event.preventDefault();
+
+      if (!facultyForm.reportValidity()) return;
+
+      var saveButton = facultyForm.querySelector('button[type="submit"]');
+
+      var payload = {
+        name: $("f_name").value.trim(),
+        email: $("f_email").value.trim(),
+        password: $("f_password").value,
+        employee_id: $("employee_id").value.trim(),
+        department: $("f_department").value.trim()
+      };
+
+      saveButton.disabled = true;
+      saveButton.textContent = "Saving...";
+
+      apiPost("/users/faculty", payload)
+        .then(function (result) {
+          toast(result.message || "Faculty created successfully.", "success");
+          facultyForm.reset();
+
+          var dialog = $("dlg-faculty");
+          if (dialog && dialog.open) dialog.close();
+
+          return loadAll();
+        })
+        .catch(function (err) {
+          toast("Could not create faculty: " + err.message, "error");
+        })
+        .finally(function () {
+          saveButton.disabled = false;
+          saveButton.textContent = "Save Faculty";
+        });
+    });
+  }
+
+
 // ---------------- BUS CRUD AND PHOTO UPLOAD ----------------
 
 var busForm = $("busForm");
@@ -780,11 +1858,69 @@ function openBusEditor(bus) {
   $("bus_type").value = bus.bus_type || "";
   $("capacity").value = bus.capacity || "";
   $("registration_number").value = bus.registration_number || "";
+  renderBusRouteOptions(bus.route_id);
 
   $("front_photo").value = "";
   $("side_photo").value = "";
 
+  setBusPhotoPreview("front_photo", "front_photo_preview", bus.front_photo);
+  setBusPhotoPreview("side_photo", "side_photo_preview", bus.side_photo);
+
   $("dlg-bus").showModal();
+}
+
+
+// Bus photo previews: existing images and newly selected images
+function setBusPhotoPreview(inputId, previewId, savedPath) {
+  var input = $(inputId);
+  var preview = $(previewId);
+
+  if (!input || !preview) return;
+
+  if (preview.dataset.objectUrl) {
+    URL.revokeObjectURL(preview.dataset.objectUrl);
+    delete preview.dataset.objectUrl;
+  }
+
+  var file = input.files && input.files[0];
+
+  if (file) {
+    var objectUrl = URL.createObjectURL(file);
+    preview.dataset.objectUrl = objectUrl;
+    preview.src = objectUrl;
+    preview.hidden = false;
+    return;
+  }
+
+  if (savedPath) {
+    preview.src = API_BASE + savedPath;
+    preview.hidden = false;
+  } else {
+    preview.removeAttribute("src");
+    preview.hidden = true;
+  }
+}
+
+["front_photo", "side_photo"].forEach(function (id) {
+  var input = $(id);
+  if (!input) return;
+
+  input.addEventListener("change", function () {
+    setBusPhotoPreview(
+      id,
+      id + "_preview",
+      null
+    );
+  });
+});
+
+
+// Refresh available routes when Bus Type changes
+var busTypeSelect = $("bus_type");
+if (busTypeSelect) {
+  busTypeSelect.addEventListener("change", function () {
+    renderBusRouteOptions("");
+  });
 }
 
 
@@ -794,6 +1930,10 @@ document.querySelectorAll('[data-open-dialog="dlg-bus"]').forEach(function (btn)
     editingBusId = null;
 
     busForm.reset();
+    renderBusRouteOptions("");
+
+    setBusPhotoPreview("front_photo", "front_photo_preview", null);
+    setBusPhotoPreview("side_photo", "side_photo_preview", null);
 
     $("dlg-bus-t").textContent = "Add Bus";
   });
@@ -849,81 +1989,164 @@ function deleteBus(bus) {
 
 
 
-// Add Stop form submission
-var stopForm = $("stopForm");
 
-if (stopForm) {
-  stopForm.addEventListener("submit", function (event) {
-    event.preventDefault();
+  // Route and Stop Add/Edit/Delete actions
+  function openRouteEditor(route) {
+    editingRouteId = route.route_id;
+    $("route_name").value = route.route_name || "";
+    $("route_code").value = route.route_code || "";
+    $("start_point").value = route.start_point || "";
+    $("end_point").value = route.end_point || "";
+    $("description").value = route.description || "";
+    $("dlg-route-t").textContent = "Edit Route";
+    $("routeForm").querySelector(".note").textContent = "Update the route details and save your changes.";
+    $("routeForm").querySelector('button[type="submit"]').textContent = "Update Route";
+    $("dlg-route").showModal();
+  }
 
-    if (!stopForm.reportValidity()) return;
+  function deleteRoute(route) {
+    if (!confirm("Delete route " + route.route_code + " - " + route.route_name + "?")) return;
 
-    var saveButton = stopForm.querySelector('button[type="submit"]');
-
-    var payload = {
-      route_id: Number($("stop_route").value),
-      stop_name: $("stop_name").value.trim(),
-      latitude: Number($("latitude").value),
-      longitude: Number($("longitude").value),
-      stop_order: Number($("stop_order").value)
-    };
-
-    if (!payload.route_id) {
-      toast("Please select a route.", "error");
-      return;
-    }
-
-    if (
-      !Number.isFinite(payload.latitude) ||
-      payload.latitude < -90 ||
-      payload.latitude > 90 ||
-      !Number.isFinite(payload.longitude) ||
-      payload.longitude < -180 ||
-      payload.longitude > 180 ||
-      !Number.isInteger(payload.stop_order) ||
-      payload.stop_order < 1
-    ) {
-      toast("Please enter valid coordinates and stop order.", "error");
-      return;
-    }
-
-    saveButton.disabled = true;
-    saveButton.textContent = "Saving...";
-
-    apiPost("/users/stops", payload)
+    apiMutation("/users/routes/" + encodeURIComponent(route.route_id), "DELETE")
       .then(function (result) {
-        toast(result.message || "Stop created successfully.", "success");
-
-        selectedRouteId = payload.route_id;
-        stopForm.reset();
-
-        var dialog = $("dlg-stop");
-        if (dialog && dialog.open) dialog.close();
-
+        if (selectedRouteId === route.route_id) {
+          selectedRouteId = null;
+          stops.rows = [];
+          stops.status = "idle";
+          $("stopsRouteName").textContent = "";
+          tables.stops.render();
+        }
+        toast(result.message || "Route deleted successfully.", "success");
         return loadAll();
       })
       .catch(function (err) {
-        toast("Could not create stop: " + err.message, "error");
+        toast("Could not delete route: " + err.message, "error");
+      });
+  }
+
+  function openStopEditor(stop) {
+    editingStopId = stop.stop_id;
+    $("stop_route").value = String(stop.route_id);
+    $("stop_route").disabled = true;
+    $("stop_name").value = stop.stop_name || "";
+    $("latitude").value = stop.latitude;
+    $("longitude").value = stop.longitude;
+    $("stop_order").value = stop.stop_order;
+    $("stop_pickup_time").value = stop.pickup_time ? stop.pickup_time.substring(0, 5) : "";
+    $("stop_drop_time").value = stop.drop_time ? stop.drop_time.substring(0, 5) : "";
+    $("dlg-stop-t").textContent = "Edit Stop";
+    $("dlg-stop").showModal();
+  }
+
+  function deleteStop(stop) {
+    if (!confirm("Delete stop " + stop.stop_name + "?")) return;
+
+    apiMutation("/users/stops/" + encodeURIComponent(stop.stop_id), "DELETE")
+      .then(function (result) {
+        toast(result.message || "Stop deleted successfully.", "success");
+        var route = findRoute(selectedRouteId);
+        if (route) return loadStops(route);
       })
-      .finally(function () {
+      .catch(function (err) {
+        toast("Could not delete stop: " + err.message, "error");
+      });
+  }
+
+  // Reset forms when Add buttons are clicked.
+  document.querySelectorAll('[data-open-dialog="dlg-route"]').forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      editingRouteId = null;
+      routeForm.reset();
+      $("dlg-route-t").textContent = "Add route";
+      $("routeForm").querySelector(".note").textContent = "Create a new route and save it to the database.";
+      $("routeForm").querySelector('button[type="submit"]').textContent = "Save Route";
+    });
+  });
+
+  document.querySelectorAll('[data-open-dialog="dlg-stop"]').forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      editingStopId = null;
+      stopForm.reset();
+      $("stop_route").disabled = false;
+      renderStopRouteOptions();
+      if (selectedRouteId !== null) $("stop_route").value = String(selectedRouteId);
+      $("dlg-stop-t").textContent = "Add stop";
+    });
+  });
+
+  // Add/Edit Stop form submission
+  var stopForm = $("stopForm");
+
+  if (stopForm) {
+    stopForm.addEventListener("submit", function (event) {
+      event.preventDefault();
+      if (!stopForm.reportValidity()) return;
+
+      var saveButton = stopForm.querySelector('button[type="submit"]');
+      var isEditing = editingStopId !== null;
+
+      var payload = {
+        stop_name: $("stop_name").value.trim(),
+        latitude: Number($("latitude").value),
+        longitude: Number($("longitude").value),
+        stop_order: Number($("stop_order").value),
+        pickup_time: $("stop_pickup_time").value || null,
+        drop_time: $("stop_drop_time").value || null
+      };
+
+      if (!isEditing) payload.route_id = Number($("stop_route").value);
+
+      if (!isEditing && !payload.route_id) {
+        toast("Please select a route.", "error");
+        return;
+      }
+
+      if (
+        !Number.isFinite(payload.latitude) ||
+        payload.latitude < -90 || payload.latitude > 90 ||
+        !Number.isFinite(payload.longitude) ||
+        payload.longitude < -180 || payload.longitude > 180 ||
+        !Number.isInteger(payload.stop_order) || payload.stop_order < 1
+      ) {
+        toast("Please enter valid coordinates and stop order.", "error");
+        return;
+      }
+
+      saveButton.disabled = true;
+      saveButton.textContent = isEditing ? "Updating..." : "Saving...";
+
+      var request = isEditing
+        ? apiMutation("/users/stops/" + encodeURIComponent(editingStopId), "PUT", payload)
+        : apiPost("/users/stops", payload);
+
+      request.then(function (result) {
+        var routeId = isEditing ? selectedRouteId : payload.route_id;
+        toast(result.message || (isEditing ? "Stop updated successfully." : "Stop created successfully."), "success");
+        editingStopId = null;
+        stopForm.reset();
+        $("stop_route").disabled = false;
+        $("dlg-stop").close();
+        selectedRouteId = routeId;
+        return loadAll();
+      }).catch(function (err) {
+        toast("Could not save stop: " + err.message, "error");
+      }).finally(function () {
         saveButton.disabled = false;
         saveButton.textContent = "Save Stop";
       });
-  });
-}
+    });
+  }
 
-
-
-  // Add Route form submission
+  // Add/Edit Route form submission
   var routeForm = $("routeForm");
 
   if (routeForm) {
     routeForm.addEventListener("submit", function (event) {
       event.preventDefault();
-
       if (!routeForm.reportValidity()) return;
 
       var saveButton = routeForm.querySelector('button[type="submit"]');
+      var isEditing = editingRouteId !== null;
 
       var payload = {
         route_name: $("route_name").value.trim(),
@@ -934,30 +2157,27 @@ if (stopForm) {
       };
 
       saveButton.disabled = true;
-      saveButton.textContent = "Saving...";
+      saveButton.textContent = isEditing ? "Updating..." : "Saving...";
 
-      apiPost("/users/routes", payload)
-        .then(function (result) {
-          toast(result.message || "Route created successfully.", "success");
+      var request = isEditing
+        ? apiMutation("/users/routes/" + encodeURIComponent(editingRouteId), "PUT", payload)
+        : apiPost("/users/routes", payload);
 
-          selectedRouteId = result.route_id;
-          routeForm.reset();
-
-          var dialog = $("dlg-route");
-          if (dialog && dialog.open) dialog.close();
-
-          return loadAll();
-        })
-        .catch(function (err) {
-          toast("Could not create route: " + err.message, "error");
-        })
-        .finally(function () {
-          saveButton.disabled = false;
-          saveButton.textContent = "Save Route";
-        });
+      request.then(function (result) {
+        toast(result.message || (isEditing ? "Route updated successfully." : "Route created successfully."), "success");
+        selectedRouteId = result.route_id;
+        editingRouteId = null;
+        routeForm.reset();
+        $("dlg-route").close();
+        return loadAll();
+      }).catch(function (err) {
+        toast("Could not save route: " + err.message, "error");
+      }).finally(function () {
+        saveButton.disabled = false;
+        saveButton.textContent = editingRouteId !== null ? "Update Route" : "Save Route";
+      });
     });
   }
-
 
 // Add and Edit Bus form submission
 if (busForm) {
@@ -974,7 +2194,10 @@ if (busForm) {
       bus_number: $("bus_number").value.trim(),
       bus_type: $("bus_type").value,
       capacity: Number($("capacity").value),
-      registration_number: $("registration_number").value.trim()
+      registration_number: $("registration_number").value.trim(),
+      route_id: $("bus_route").value
+        ? Number($("bus_route").value)
+        : null
     };
 
     var wasEditing = editingBusId !== null;
@@ -1043,9 +2266,62 @@ if (busForm) {
   });
 }
 
+// Create Trip form submission
+var tripForm = $("tripForm");
 
-  renderAll();
-  loadAll();
+if (tripForm) {
+  tripForm.addEventListener("submit", function (event) {
+    event.preventDefault();
+
+    if (!tripForm.reportValidity()) return;
+
+    var payload = {
+      bus_id: Number($("trip_bus").value),
+      route_id: Number($("trip_route").value),
+      driver_id: Number($("trip_driver").value),
+      trip_date: $("trip_date_in").value
+    };
+
+    if (
+      !payload.bus_id ||
+      !payload.route_id ||
+      !payload.driver_id ||
+      !payload.trip_date
+    ) {
+      toast("Please fill all trip details.", "error");
+      return;
+    }
+
+    var saveButton = tripForm.querySelector('button[type="submit"]');
+    saveButton.disabled = true;
+    saveButton.textContent = "Saving...";
+
+    apiPost("/trips/", payload)
+     .then(function (result) {
+      toast(result.message || "Trip scheduled successfully.", "success");
+     tripForm.reset();
+
+     updateTripDriver();
+
+     var dialog = $("dlg-trip");
+     if (dialog && dialog.open) dialog.close();
+
+     return load("trips");
+    })
+    
+      .catch(function (err) {
+        toast("Could not create trip: " + err.message, "error");
+      })
+      .finally(function () {
+        saveButton.disabled = false;
+        saveButton.textContent = "Save Trip";
+      });
+  });
+}
+
+
+ renderAll();
+loadAll();
+loadNotifications();
+loadDriverRequests();
 })();
-
- 

@@ -312,5 +312,158 @@ a{color:inherit;text-decoration:none}
 
 /* 2. Broken image path (../images/university-bus.jpg):
       JS hides the broken <img>, so show the real bus photo behind it. */
-.route-bus-image,
-.large-bus-photo{background:url("../photo/bus.jpg") center/cover no-repeat}
+/* Bus images are now loaded dynamically from the backend. */
+/* All University Buses gallery */
+.university-buses-section {
+  margin-top: 24px;
+  padding: 22px;
+}
+
+.university-buses-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.university-bus-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 14px;
+  background: var(--card-bg, #fff);
+}
+
+.university-bus-card-photo {
+  display: block;
+  width: 100%;
+  height: 190px;
+  object-fit: contain;
+  background: #f1f5f9;
+  padding: 8px;
+}
+
+.university-bus-card-body {
+  padding: 16px;
+}
+
+.university-bus-card-body h3 {
+  margin: 0 0 8px;
+}
+
+.university-bus-card-body p {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--text-secondary, #64748b);
+}
+
+.bus-type-label {
+  display: inline-block;
+  padding: 5px 9px;
+  border-radius: 20px;
+  background: #eaf2ff;
+  color: #2457a7;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+@media (max-width: 600px) {
+  .university-buses-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .university-bus-card-photo {
+    height: 210px;
+  }
+}
+
+/* Improved bus photo visibility across student dashboard */
+.bus-image img {
+    width: 100%;
+    height: 220px;
+    object-fit: contain;
+    background: #f1f5f9;
+}
+
+.route-bus-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #f1f5f9;
+}
+
+.large-bus-photo {
+    height: 260px;
+    background: #f1f5f9;
+}
+
+.large-bus-photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.tracking-bus-image img {
+    width: 100%;
+    height: 190px;
+    object-fit: contain;
+    background: #f1f5f9;
+}
+
+.detail-bus-image img {
+    width: 100%;
+    height: 300px;
+    object-fit: contain;
+    background: #f1f5f9;
+}
+
+.university-bus-card-photo {
+    width: 100%;
+    height: 220px;
+    object-fit: contain;
+    background: #f1f5f9;
+}
+
+/* Professional University Bus Fleet Cards */
+.large-route-card {
+    border-radius: 16px;
+    overflow: hidden;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 5px 18px rgba(15, 23, 42, 0.07);
+}
+
+.large-bus-photo {
+    position: relative;
+    height: 230px;
+    padding: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background: linear-gradient(135deg, #eaf1f8, #f8fafc);
+}
+
+.large-bus-photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    object-position: center;
+    border-radius: 10px;
+}
+
+.large-route-content {
+    padding: 18px;
+    gap: 14px;
+}
+
+.route-card-heading h3 {
+    font-size: 18px;
+    line-height: 1.4;
+}
+
+@media (max-width: 600px) {
+    .large-bus-photo {
+        height: 200px;
+    }
+}

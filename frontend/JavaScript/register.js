@@ -15,7 +15,7 @@
     // CONFIG
     // =====================================================
 
-    const API_BASE = "http://127.0.0.1:8000";
+    const API_BASE = window.API_BASE_URL;
 
     /*
        This endpoint will be added to the backend:
@@ -56,6 +56,9 @@
 
     const facultyFields =
         document.getElementById("facultyFields");
+     
+    const driverFields =
+        document.getElementById("driverFields");    
 
     const registerBtn =
         document.getElementById("registerBtn");
@@ -113,12 +116,14 @@
             const role =
                 roleInput.value;
 
-
             studentFields.hidden =
                 role !== "STUDENT";
 
             facultyFields.hidden =
                 role !== "FACULTY";
+             
+            driverFields.hidden =
+                role !== "DRIVER";    
 
 
             /*
@@ -239,6 +244,7 @@
                     "Please enter your email address."
                 );
 
+            
                 emailInput.focus();
 
                 return;
@@ -276,17 +282,7 @@
             // DRIVER / ADMIN RESTRICTION
             // =================================================
 
-            if (role === "DRIVER") {
-
-                showMessage(
-                    "Driver accounts must be created or approved by an administrator.",
-                    "info"
-                );
-
-                return;
-            }
-
-
+        
             if (role === "ADMIN") {
 
                 showMessage(
@@ -373,6 +369,16 @@
                     "facultyDepartment"
                 )?.value.trim();
 
+            const licenseNumber =
+                document.getElementById(
+                    "driverLicenseNumber"
+                )?.value.trim();
+
+            const driverPhone =
+                document.getElementById(
+                    "driverPhone"
+                )?.value.trim();
+                
 
             if (role === "STUDENT") {
 
@@ -406,6 +412,24 @@
                     return;
                 }
 
+            }
+
+
+            if (role === "DRIVER") {
+
+                if (!licenseNumber || !driverPhone) {
+                    showMessage(
+                        "Please enter license number and phone number."
+                    );
+                    return;
+                }
+
+                if (!/^[0-9]{10}$/.test(driverPhone)) {
+                    showMessage(
+                        "Please enter a valid 10-digit phone number."
+                    );
+                    return;
+                }
             }
 
 
@@ -459,6 +483,16 @@
                     facultyDepartment;
 
             }
+
+
+            if (role === "DRIVER") {
+
+                    requestData.license_number =
+                        licenseNumber;
+
+                    requestData.phone =
+                        driverPhone;
+                }
 
 
             // =================================================
@@ -543,7 +577,9 @@
                 // =================================================
 
                 showMessage(
-                    "Account created successfully. Redirecting to login...",
+                    role === "DRIVER"
+                    ? "Registration submitted successfully. Waiting for Admin approval."
+                    : "Account created successfully. Redirecting to login...",
                     "success"
                 );
 
@@ -554,19 +590,25 @@
 
                 facultyFields.hidden = true;
 
-
-                setTimeout(
-                    function () {
-
-                        window.location.href =
-                            "login.html";
-
-                    },
-                    1200
-                );
+                driverFields.hidden = true;
 
 
-            } catch (error) {
+               if (role !== "DRIVER")
+                {
+
+                    setTimeout(
+                        function () {
+                            window.location.href =
+                                "login.html";
+                        },
+                        1200
+                    );
+                }
+
+
+            } 
+            catch (error)
+            {
 
                 console.error(
                     "Registration error:",

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Body
 
 from pathlib import Path
 import shutil
@@ -17,7 +17,9 @@ from backend.app.schemas.user import (
     BusCreate,
     BusUpdate,
     RouteCreate,
+    RouteUpdate,
     StopCreate,
+    StopUpdate,
     BusAssignDriver
 )
 
@@ -60,6 +62,281 @@ def get_users(current_user: dict = Depends(require_admin)):
 
     finally:
         conn.close()
+
+
+# ============================================
+# ADMIN: EDIT USER DETAILS
+# ============================================
+
+@router.put("/{user_id}")
+def update_user(
+    user_id: int,
+    payload: dict = Body(...),
+    current_user: dict = Depends(require_admin)
+):
+    conn = get_connection()
+
+    try:
+        with conn.cursor() as cursor:
+
+            cursor.execute("""
+                SELECT role
+                FROM users
+                WHERE user_id = %s
+                FOR UPDATE
+            """, (user_id,))
+
+            result = cursor.fetchone()
+
+            if not result:
+                raise HTTPException(status_code=404, detail="User not found")
+
+            role = result[0]
+
+            # Common fields
+            common_fields = {"name", "email"}
+
+            # Role-specific profile fields
+            profile_config = {
+                "STUDENT": {
+                    "table": "students",
+                    "fields": {"enrollment_no", "department", "semester"},
+                    "id_column": "user_id"
+                },
+                "FACULTY": {
+                    "table": "faculty",
+                    "fields": {"employee_id", "department"},
+                    "id_column": "user_id"
+                },
+                "DRIVER": {
+                    "table": "drivers",
+                    "fields": {"license_number", "phone"},
+                    "id_column": "user_id"
+                }
+            }
+
+            allowed_fields = set(common_fields)
+
+            if role in profile_config:
+                allowed_fields.update(profile_config[role]["fields"])
+
+            invalid_fields = set(payload) - allowed_fields
+
+            if invalid_fields:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid fields: {', '.join(invalid_fields)}"
+                )
+
+            if not payload:
+                raise HTTPException(
+                    status_code=400,
+                    detail="No fields provided"
+                )
+
+            # Validate values
+            if "name" in payload and not str(payload["name"]).strip():
+                raise HTTPException(status_code=400, detail="Name cannot be empty")
+
+            if "email" in payload:
+                email = str(payload["email"]).strip().lower()
+
+                if not email or "@" not in email:
+                    raise HTTPException(status_code=400, detail="Invalid email")
+
+                cursor.execute("""
+                    SELECT user_id FROM users
+                    WHERE LOWER(email) = %s AND user_id != %s
+                """, (email, user_id))
+
+                if cursor.fetchone():
+                    raise HTTPException(status_code=409, detail="Email already exists")
+
+                payload["email"] = email
+
+            if "semester" in payload:
+                if not isinstance(payload["semester"], int) or payload["semester"] < 1:
+                    raise HTTPException(status_code=400, detail="Invalid semester")
+
+            # Update common user fields
+            user_updates = {
+                key: value for key, value in payload.items()
+                if key in common_fields
+            }
+
+            if user_updates:
+                set_clause = ", ".join(
+                    f"{key} = %s" for key in user_updates
+                )
+
+                cursor.execute(
+                    f"UPDATE users SET {set_clause} WHERE user_id = %s",
+                    list(user_updates.values()) + [user_id]
+                )
+
+            # Update role-specific profile
+            profile_updates = {
+                key: value for key, value in payload.items()
+                if key not in common_fields
+            }
+
+            if profile_updates:
+                if role not in profile_config:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="This role has no editable profile fields"
+                    )
+
+                config = profile_config[role]
+
+                # Check unique profile fields
+                unique_field = {
+                    "STUDENT": "enrollment_no",
+                    "FACULTY": "employee_id",
+                    "DRIVER": "license_number"
+                }[role]
+
+                if unique_field in profile_updates:
+                    cursor.execute(
+                        f"""
+                        SELECT user_id FROM {config['table']}
+                        WHERE {unique_field} = %s AND user_id != %s
+                        """,
+                        (profile_updates[unique_field], user_id)
+                    )
+
+                    if cursor.fetchone():
+                        raise HTTPException(
+                            status_code=409,
+                            detail=f"{unique_field} already exists"
+                        )
+
+                set_clause = ", ".join(
+                    f"{key} = %s" for key in profile_updates
+                )
+
+                cursor.execute(
+                    f"""
+                    UPDATE {config['table']}
+                    SET {set_clause}
+                    WHERE user_id = %s
+                    """,
+                    list(profile_updates.values()) + [user_id]
+                )
+
+                if cursor.rowcount == 0:
+                    raise HTTPException(
+                        status_code=404,
+                        detail="User profile not found"
+                    )
+
+            conn.commit()
+
+            return {
+                "message": "User updated successfully",
+                "user_id": user_id,
+                "role": role
+            }
+
+        
+
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception:
+        conn.rollback()
+        raise
+
+    finally:
+        conn.close()
+
+
+# ============================================
+# ADMIN: ACTIVATE / DEACTIVATE USER
+# ============================================
+
+@router.patch("/{user_id}/status")
+def update_user_status(
+    user_id: int,
+    payload: dict = Body(...),
+    current_user: dict = Depends(require_admin)
+):
+    conn = get_connection()
+
+    try:
+        is_active = payload.get("is_active")
+
+        if not isinstance(is_active, bool):
+            raise HTTPException(
+                status_code=400,
+                detail="is_active must be true or false"
+            )
+
+        with conn.cursor() as cursor:
+
+            cursor.execute("""
+                SELECT role, is_active
+                FROM users
+                WHERE user_id = %s
+                FOR UPDATE
+            """, (user_id,))
+
+            user = cursor.fetchone()
+
+            if not user:
+                raise HTTPException(status_code=404, detail="User not found")
+
+            role, current_status = user
+
+            if current_status == is_active:
+                return {
+                    "message": "User status is already set",
+                    "user_id": user_id,
+                    "is_active": is_active
+                }
+
+            # Prevent deactivation of the last active admin
+            if role == "ADMIN" and not is_active:
+                cursor.execute("""
+                    SELECT COUNT(*)
+                    FROM users
+                    WHERE role = 'ADMIN' AND is_active = TRUE
+                """)
+
+                active_admins = cursor.fetchone()[0]
+
+                if active_admins <= 1:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Cannot deactivate the last active admin"
+                    )
+
+            cursor.execute("""
+                UPDATE users
+                SET is_active = %s
+                WHERE user_id = %s
+            """, (is_active, user_id))
+
+            conn.commit()
+
+            return {
+                "message": "User status updated successfully",
+                "user_id": user_id,
+                "is_active": is_active
+            }
+
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception:
+        conn.rollback()
+        raise
+
+    finally:
+        conn.close()
+
 
 
 # Admin: Create a new user
@@ -228,6 +505,22 @@ def create_driver(
 
             driver_id = cursor.fetchone()[0]
 
+            # Notify all Admin accounts about new driver
+            cursor.execute("""
+                INSERT INTO notifications
+                    (user_id, title, message, notification_type)
+                SELECT
+                    user_id,
+                    %s,
+                    %s,
+                    %s
+                FROM users
+                WHERE role = 'ADMIN'
+            """, (
+                "New Driver Added",
+                f"{driver.name} has been added by Admin.",
+                "DRIVER_ADDED"
+            ))
             conn.commit()
 
             return {
@@ -311,6 +604,34 @@ def create_faculty(
     finally:
         conn.close()        
 # Admin: Create a bus
+def validate_bus_route(cursor, bus_type, route_id):
+    if route_id is None:
+        return
+
+    cursor.execute(
+        "SELECT route_code, is_active FROM routes WHERE route_id = %s",
+        (route_id,)
+    )
+    route = cursor.fetchone()
+
+    if not route:
+        raise HTTPException(status_code=404, detail="Route not found")
+
+    route_code, is_active = route
+
+    if not is_active:
+        raise HTTPException(status_code=400, detail="Route is inactive")
+
+    allowed = (
+        {"R001", "R002", "R003", "R004", "R005", "R006"}
+        if bus_type == "ROUTE_BUS"
+        else {"R007", "R008"}
+    )
+
+    if route_code not in allowed:
+        raise HTTPException(status_code=400, detail="Route does not match bus type")
+
+
 @router.post("/buses")
 def create_bus(
     bus: BusCreate,
@@ -321,22 +642,26 @@ def create_bus(
     try:
         with conn.cursor() as cursor:
 
+            validate_bus_route(cursor, bus.bus_type, bus.route_id)
+
             cursor.execute("""
                 INSERT INTO buses
-                    (bus_number, bus_type, capacity, registration_number)
+                    (bus_number, bus_type, capacity, registration_number, route_id)
                 VALUES
-                    (%s, %s, %s, %s)
+                    (%s, %s, %s, %s, %s)
                 RETURNING
                     bus_id,
                     bus_number,
                     bus_type,
                     capacity,
-                    registration_number
+                    registration_number,
+                    route_id
             """, (
                 bus.bus_number,
                 bus.bus_type,
                 bus.capacity,
-                bus.registration_number
+                bus.registration_number,
+                bus.route_id
             ))
 
             new_bus = cursor.fetchone()
@@ -348,7 +673,8 @@ def create_bus(
                 "bus_number": new_bus[1],
                 "bus_type": new_bus[2],
                 "capacity": new_bus[3],
-                "registration_number": new_bus[4]
+                "registration_number": new_bus[4],
+                "route_id": new_bus[5]
             }
 
     except Exception:
@@ -439,22 +765,27 @@ def create_stop(
 
             cursor.execute("""
                 INSERT INTO stops
-                    (route_id, stop_name, latitude, longitude, stop_order)
+                    (route_id, stop_name, latitude, longitude, stop_order,
+                     pickup_time, drop_time)
                 VALUES
-                    (%s, %s, %s, %s, %s)
+                    (%s, %s, %s, %s, %s, %s, %s)
                 RETURNING
                     stop_id,
                     route_id,
                     stop_name,
                     latitude,
                     longitude,
-                    stop_order
+                    stop_order,
+                    pickup_time,
+                    drop_time
             """, (
                 stop.route_id,
                 stop.stop_name,
                 stop.latitude,
                 stop.longitude,
-                stop.stop_order
+                stop.stop_order,
+                stop.pickup_time or None,
+                stop.drop_time or None
             ))
 
             new_stop = cursor.fetchone()
@@ -467,7 +798,9 @@ def create_stop(
                 "stop_name": new_stop[2],
                 "latitude": float(new_stop[3]),
                 "longitude": float(new_stop[4]),
-                "stop_order": new_stop[5]
+                "stop_order": new_stop[5],
+                "pickup_time": str(new_stop[6]) if new_stop[6] is not None else None,
+                "drop_time": str(new_stop[7]) if new_stop[7] is not None else None
             }
 
     except Exception:
@@ -495,7 +828,9 @@ def get_route_stops(
                     stop_name,
                     latitude,
                     longitude,
-                    stop_order
+                    stop_order,
+                    pickup_time,
+                    drop_time
                 FROM stops
                 WHERE route_id = %s
                 ORDER BY stop_order
@@ -510,7 +845,9 @@ def get_route_stops(
                     "stop_name": stop[2],
                     "latitude": float(stop[3]),
                     "longitude": float(stop[4]),
-                    "stop_order": stop[5]
+                    "stop_order": stop[5],
+                    "pickup_time": str(stop[6]) if stop[6] is not None else None,
+                    "drop_time": str(stop[7]) if stop[7] is not None else None
                 }
                 for stop in stops
             ]
@@ -558,6 +895,214 @@ def get_routes(
     finally:
         conn.close()
 
+
+# Admin: Edit a route
+@router.put("/routes/{route_id}")
+def update_route(
+    route_id: int,
+    payload: RouteUpdate,
+    current_user: dict = Depends(require_admin)
+):
+    fields = payload.dict(exclude_unset=True)
+    allowed = {
+        "route_name", "route_code", "description",
+        "start_point", "end_point", "is_active"
+    }
+    fields = {k: v for k, v in fields.items() if k in allowed}
+
+    if not fields:
+        raise HTTPException(status_code=400, detail="No route fields supplied")
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "SELECT route_id FROM routes WHERE route_id = %s FOR UPDATE",
+                (route_id,)
+            )
+            if not cursor.fetchone():
+                raise HTTPException(status_code=404, detail="Route not found")
+
+            if "route_code" in fields:
+                cursor.execute(
+                    "SELECT route_id FROM routes WHERE route_code = %s AND route_id <> %s",
+                    (fields["route_code"], route_id)
+                )
+                if cursor.fetchone():
+                    raise HTTPException(status_code=409, detail="Route code already exists")
+
+            assignments = ", ".join(f"{key} = %s" for key in fields)
+            values = list(fields.values()) + [route_id]
+            cursor.execute(
+                f"""
+                UPDATE routes SET {assignments}
+                WHERE route_id = %s
+                RETURNING route_id, route_name, route_code, description,
+                          start_point, end_point, is_active
+                """,
+                values
+            )
+            row = cursor.fetchone()
+            conn.commit()
+            return {
+                "message": "Route updated successfully",
+                "route_id": row[0],
+                "route_name": row[1],
+                "route_code": row[2],
+                "description": row[3],
+                "start_point": row[4],
+                "end_point": row[5],
+                "is_active": row[6]
+            }
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+# Admin: Delete a route only when it has no dependent records
+@router.delete("/routes/{route_id}")
+def delete_route(
+    route_id: int,
+    current_user: dict = Depends(require_admin)
+):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "SELECT route_id FROM routes WHERE route_id = %s FOR UPDATE",
+                (route_id,)
+            )
+            if not cursor.fetchone():
+                raise HTTPException(status_code=404, detail="Route not found")
+
+            dependencies = {}
+            for table in ("buses", "trips", "stops", "schedules", "subscriptions"):
+                cursor.execute(
+                    f"SELECT COUNT(*) FROM {table} WHERE route_id = %s",
+                    (route_id,)
+                )
+                dependencies[table] = cursor.fetchone()[0]
+
+            used_by = {k: v for k, v in dependencies.items() if v > 0}
+            if used_by:
+                raise HTTPException(
+                    status_code=409,
+                    detail={"message": "Route cannot be deleted because records depend on it",
+                            "dependencies": used_by}
+                )
+
+            cursor.execute("DELETE FROM routes WHERE route_id = %s", (route_id,))
+            conn.commit()
+            return {"message": "Route deleted successfully", "route_id": route_id}
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+# Admin: Edit a stop, including its timetable
+@router.put("/stops/{stop_id}")
+def update_stop(
+    stop_id: int,
+    payload: StopUpdate,
+    current_user: dict = Depends(require_admin)
+):
+    fields = payload.dict(exclude_unset=True)
+    allowed = {
+        "stop_name", "latitude", "longitude", "stop_order",
+        "pickup_time", "drop_time"
+    }
+    fields = {k: v for k, v in fields.items() if k in allowed}
+
+    if not fields:
+        raise HTTPException(status_code=400, detail="No stop fields supplied")
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "SELECT route_id FROM stops WHERE stop_id = %s FOR UPDATE",
+                (stop_id,)
+            )
+            existing = cursor.fetchone()
+            if not existing:
+                raise HTTPException(status_code=404, detail="Stop not found")
+
+            route_id = existing[0]
+            if "stop_order" in fields:
+                cursor.execute(
+                    """
+                    SELECT stop_id FROM stops
+                    WHERE route_id = %s AND stop_order = %s AND stop_id <> %s
+                    """,
+                    (route_id, fields["stop_order"], stop_id)
+                )
+                if cursor.fetchone():
+                    raise HTTPException(
+                        status_code=409,
+                        detail="This stop order is already used on the route"
+                    )
+
+            assignments = ", ".join(f"{key} = %s" for key in fields)
+            values = list(fields.values()) + [stop_id]
+            cursor.execute(
+                f"""
+                UPDATE stops SET {assignments}
+                WHERE stop_id = %s
+                RETURNING stop_id, route_id, stop_name, latitude, longitude,
+                          stop_order, pickup_time, drop_time
+                """,
+                values
+            )
+            row = cursor.fetchone()
+            conn.commit()
+            return {
+                "message": "Stop updated successfully",
+                "stop_id": row[0],
+                "route_id": row[1],
+                "stop_name": row[2],
+                "latitude": float(row[3]),
+                "longitude": float(row[4]),
+                "stop_order": row[5],
+                "pickup_time": str(row[6]) if row[6] is not None else None,
+                "drop_time": str(row[7]) if row[7] is not None else None
+            }
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+# Admin: Delete a stop
+@router.delete("/stops/{stop_id}")
+def delete_stop(
+    stop_id: int,
+    current_user: dict = Depends(require_admin)
+):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "SELECT stop_id FROM stops WHERE stop_id = %s FOR UPDATE",
+                (stop_id,)
+            )
+            if not cursor.fetchone():
+                raise HTTPException(status_code=404, detail="Stop not found")
+
+            cursor.execute("DELETE FROM stops WHERE stop_id = %s", (stop_id,))
+            conn.commit()
+            return {"message": "Stop deleted successfully", "stop_id": stop_id}
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 # Admin: View all buses
 @router.get("/buses")
 def get_buses(
@@ -569,16 +1114,20 @@ def get_buses(
         with conn.cursor() as cursor:
             cursor.execute("""
                 SELECT
-                    bus_id,
-                    bus_number,
-                    bus_type,
-                    capacity,
-                    registration_number,
-                    driver_id,
-                    front_photo,
-                    side_photo
-                FROM buses
-                ORDER BY bus_id
+                    b.bus_id,
+                    b.bus_number,
+                    b.bus_type,
+                    b.capacity,
+                    b.registration_number,
+                    b.driver_id,
+                    b.front_photo,
+                    b.side_photo,
+                    b.route_id,
+                    r.route_code,
+                    r.route_name
+                FROM buses b
+                LEFT JOIN routes r ON b.route_id = r.route_id
+                ORDER BY b.bus_id
             """)
 
             buses = cursor.fetchall()
@@ -592,13 +1141,17 @@ def get_buses(
                     "registration_number": bus[4],
                     "driver_id": bus[5],
                     "front_photo": bus[6],
-                    "side_photo": bus[7]
+                    "side_photo": bus[7],
+                    "route_id": bus[8],
+                    "route_code": bus[9],
+                    "route_name": bus[10]
                 }
                 for bus in buses
             ]
 
     finally:
         conn.close()
+
 
 # Admin: View all drivers
 @router.get("/drivers")
@@ -641,6 +1194,95 @@ def get_drivers(
         conn.close()   
 
 
+# Admin: View all faculty members
+@router.get("/faculty")
+def get_faculty(
+    current_user: dict = Depends(require_admin)
+):
+    conn = get_connection()
+
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT
+                    f.faculty_id,
+                    u.user_id,
+                    u.name,
+                    u.email,
+                    f.employee_id,
+                    f.department,
+                    u.is_active
+                FROM faculty f
+                JOIN users u ON f.user_id = u.user_id
+                WHERE u.role = 'FACULTY'
+                ORDER BY f.faculty_id
+            """)
+
+            faculty_members = cursor.fetchall()
+
+            return [
+                {
+                    "faculty_id": faculty[0],
+                    "user_id": faculty[1],
+                    "name": faculty[2],
+                    "email": faculty[3],
+                    "employee_id": faculty[4],
+                    "department": faculty[5],
+                    "is_active": faculty[6]
+                }
+                for faculty in faculty_members
+            ]
+
+    finally:
+        conn.close()
+
+
+# Admin: View all students
+@router.get("/students")
+def get_students(
+    current_user: dict = Depends(require_admin)
+):
+    conn = get_connection()
+
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT
+                    s.student_id,
+                    u.user_id,
+                    u.name,
+                    u.email,
+                    s.enrollment_no,
+                    s.department,
+                    s.semester,
+                    u.is_active
+                FROM students s
+                JOIN users u ON s.user_id = u.user_id
+                WHERE u.role = 'STUDENT'
+                ORDER BY s.student_id
+            """)
+
+            students = cursor.fetchall()
+
+            return [
+                {
+                    "student_id": student[0],
+                    "user_id": student[1],
+                    "name": student[2],
+                    "email": student[3],
+                    "enrollment_no": student[4],
+                    "department": student[5],
+                    "semester": student[6],
+                    "is_active": student[7]
+                }
+                for student in students
+            ]
+
+    finally:
+        conn.close()
+
+
+
 # Admin: Update bus details
 @router.put("/buses/{bus_id}")
 def update_bus(
@@ -663,7 +1305,8 @@ def update_bus(
             "bus_number",
             "bus_type",
             "capacity",
-            "registration_number"
+            "registration_number",
+            "route_id"
         }
 
         invalid_fields = set(update_fields) - allowed_fields
@@ -676,21 +1319,28 @@ def update_bus(
 
         with conn.cursor() as cursor:
             cursor.execute("""
-                SELECT bus_id
+                SELECT bus_id, bus_type, route_id
                 FROM buses
                 WHERE bus_id = %s
+                FOR UPDATE
             """, (bus_id,))
 
-            if not cursor.fetchone():
+            existing_bus = cursor.fetchone()
+
+            if not existing_bus:
                 raise HTTPException(
                     status_code=404,
                     detail="Bus not found"
                 )
 
+            effective_type = update_fields.get("bus_type", existing_bus[1])
+            effective_route = update_fields.get("route_id", existing_bus[2])
+
+            validate_bus_route(cursor, effective_type, effective_route)
+
             set_clause = ", ".join(
                 f"{field} = %s" for field in update_fields
             )
-
             values = list(update_fields.values()) + [bus_id]
 
             cursor.execute(
@@ -699,7 +1349,7 @@ def update_bus(
                 SET {set_clause}
                 WHERE bus_id = %s
                 RETURNING bus_id, bus_number, bus_type,
-                          capacity, registration_number, driver_id
+                          capacity, registration_number, driver_id, route_id
                 """,
                 values
             )
@@ -714,7 +1364,8 @@ def update_bus(
                 "bus_type": updated_bus[2],
                 "capacity": updated_bus[3],
                 "registration_number": updated_bus[4],
-                "driver_id": updated_bus[5]
+                "driver_id": updated_bus[5],
+                "route_id": updated_bus[6]
             }
 
     except Exception:
@@ -723,6 +1374,7 @@ def update_bus(
 
     finally:
         conn.close()
+
 
 # Admin: Delete a bus
 @router.delete("/buses/{bus_id}")
@@ -1325,3 +1977,142 @@ def reject_driver_request(
 
     finally:
         conn.close()
+
+
+
+
+
+# ============================================
+# ADMIN: NOTIFICATIONS
+# ============================================
+
+# Get notifications for logged-in admin
+@router.get("/notifications")
+def get_admin_notifications(
+    current_user: dict = Depends(require_admin)
+):
+    conn = get_connection()
+
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT
+                    notification_id,
+                    title,
+                    message,
+                    notification_type,
+                    is_read,
+                    created_at
+                FROM notifications
+                WHERE user_id = %s
+                ORDER BY created_at DESC
+                LIMIT 50
+            """, (current_user["user_id"],))
+
+            rows = cursor.fetchall()
+
+            cursor.execute("""
+                SELECT COUNT(*)
+                FROM notifications
+                WHERE user_id = %s AND is_read = FALSE
+            """, (current_user["user_id"],))
+
+            unread_count = cursor.fetchone()[0]
+
+            notifications = [
+                {
+                    "notification_id": row[0],
+                    "title": row[1],
+                    "message": row[2],
+                    "type": row[3],
+                    "is_read": row[4],
+                    "created_at": row[5]
+                }
+                for row in rows
+            ]
+
+            return {
+                "unread_count": unread_count,
+                "notifications": notifications
+            }
+
+    finally:
+        conn.close()
+
+
+# Mark one notification as read
+@router.patch("/notifications/{notification_id}/read")
+def mark_notification_read(
+    notification_id: int,
+    current_user: dict = Depends(require_admin)
+):
+    conn = get_connection()
+
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                UPDATE notifications
+                SET is_read = TRUE
+                WHERE notification_id = %s
+                  AND user_id = %s
+                RETURNING notification_id
+            """, (
+                notification_id,
+                current_user["user_id"]
+            ))
+
+            result = cursor.fetchone()
+
+            if not result:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Notification not found"
+                )
+
+            conn.commit()
+
+            return {
+                "message": "Notification marked as read",
+                "notification_id": notification_id
+            }
+
+    except Exception:
+        conn.rollback()
+        raise
+
+    finally:
+        conn.close()
+
+
+# Mark all admin notifications as read
+@router.patch("/notifications/read-all")
+def mark_all_notifications_read(
+    current_user: dict = Depends(require_admin)
+):
+    conn = get_connection()
+
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                UPDATE notifications
+                SET is_read = TRUE
+                WHERE user_id = %s
+                  AND is_read = FALSE
+            """, (current_user["user_id"],))
+
+            updated_count = cursor.rowcount
+            conn.commit()
+
+            return {
+                "message": "All notifications marked as read",
+                "updated_count": updated_count
+            }
+
+    except Exception:
+        conn.rollback()
+        raise
+
+    finally:
+        conn.close()
+
+

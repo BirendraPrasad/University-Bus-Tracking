@@ -215,3 +215,27 @@ CREATE TABLE notifications (
         REFERENCES users(user_id)
         ON DELETE CASCADE
 );
+
+-- 13. DRIVER REGISTRATION REQUESTS
+CREATE TABLE driver_registration_requests (
+    request_id SERIAL PRIMARY KEY,
+    user_id INTEGER UNIQUE NOT NULL,
+    license_number VARCHAR(50) UNIQUE NOT NULL,
+    phone VARCHAR(20),
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING'
+        CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED')),
+    reviewed_by INTEGER,
+    reviewed_at TIMESTAMP,
+    rejection_reason TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_driver_request_user
+        FOREIGN KEY (user_id)
+        REFERENCES users(user_id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_driver_request_reviewer
+        FOREIGN KEY (reviewed_by)
+        REFERENCES users(user_id)
+        ON DELETE SET NULL
+);

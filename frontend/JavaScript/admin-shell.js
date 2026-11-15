@@ -76,4 +76,27 @@
       if (e.target === d) { d.close(); }
     });
   });
+
+    /* ---------- Notification dropdown ---------- */
+  var notificationBtn = document.getElementById("notificationBtn");
+  var notificationPanel = document.getElementById("notificationPanel");
+
+  if (notificationBtn && notificationPanel) {
+    notificationBtn.addEventListener("click", function () {
+      var isOpen = notificationPanel.hidden;
+
+      notificationPanel.hidden = !isOpen;
+      notificationBtn.setAttribute("aria-expanded", String(isOpen));
+    });
+
+    document.addEventListener("click", function (e) {
+      if (
+        !notificationPanel.contains(e.target) &&
+        !notificationBtn.contains(e.target)
+      ) {
+        notificationPanel.hidden = true;
+        notificationBtn.setAttribute("aria-expanded", "false");
+      }
+    });
+  }
 })();

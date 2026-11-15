@@ -330,3 +330,126 @@ dialog .note { margin-bottom: 16px; padding: 10px 12px; font-size: 13px; border-
 tr.is-selected { background: var(--blue-100); }
 tr.is-selected:hover { background: var(--blue-100); }
 .toast--info { border-left-color: var(--blue-600); }
+
+
+
+/* Notification Bell */
+.notification-wrapper {
+  position: relative;
+  margin-left: auto;
+  margin-right: 14px;
+}
+
+.notification-btn {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.notification-btn svg {
+  width: 21px;
+  height: 21px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.notification-count {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 20px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.notification-panel {
+  position: absolute;
+  top: 50px;
+  right: 0;
+  width: 340px;
+  max-width: calc(100vw - 30px);
+  background: #fff;
+  border: 1px solid #dce2ec;
+  border-radius: 10px;
+  box-shadow: 0 12px 35px rgba(0,0,0,.15);
+  z-index: 1000;
+}
+
+.notification-panel__head {
+  padding: 15px;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.notification-panel__head span,
+.notification-empty {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.notification-list {
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+.notification-empty {
+  text-align: center;
+  padding: 20px 5px;
+}
+
+.notification-footer {
+  display: block;
+  padding: 12px 15px;
+  border-top: 1px solid #e5e7eb;
+  color: #2563eb;
+  font-size: 13px;
+  text-decoration: none;
+}
+/* Bus photo management */
+.bus-photo-upload {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.bus-photo-preview {
+  width: 100%;
+  height: 210px;
+  display: block;
+  object-fit: contain;
+  background: #f1f5f9;
+  border: 1px solid #dbe3ee;
+  border-radius: 14px;
+  padding: 8px;
+}
+
+.bus-photo-preview[hidden] {
+  display: none;
+}
+
+.bus-photo-upload .input {
+  width: 100%;
+}
+
+@media (min-width: 900px) {
+  .bus-photo-preview {
+    height: 250px;
+  }
+}

@@ -149,7 +149,7 @@
             <span class="status-badge info" id="nextBusStatus">—</span>
           </div>
          <div class="bus-image">
-           <img src="../photo/bus.jpg" alt="University bus">
+           <img id="dashboardBusPhoto" src="../photo/bus.jpg" alt="University bus">
          </div>         
           <div class="bus-information">
             <div><h2 id="nextBusNumber">—</h2><span class="route-label" id="nextBusRoute">—</span></div>
@@ -200,6 +200,20 @@
           <div class="notification-list" id="dashNotifs"></div>
         </div>
       </div>
+
+      <!-- ========== ALL UNIVERSITY BUSES ========== -->
+      <div class="dashboard-card university-buses-section">
+        <div class="card-header">
+          <div>
+            <span class="card-eyebrow">University Fleet</span>
+            <h3>All University Buses</h3>
+          </div>
+          <span class="status-badge info" id="allBusesCount">Loading buses...</span>
+        </div>
+        <div class="university-buses-grid" id="allUniversityBusesGrid">
+          <p>Loading university buses...</p>
+        </div>
+      </div>
     </section>
 
     <!-- ========== MY ROUTES ========== -->
@@ -222,7 +236,7 @@
         <div class="dashboard-card tracking-map-card"><div id="trackingMap" class="large-map"></div></div>
         <div class="dashboard-card tracking-info">
           <span class="card-eyebrow">Active bus</span>
-          <div class="tracking-bus-image"> <img src="../photo/bus.jpg" alt="University bus"></div>  
+          <div class="tracking-bus-image"> <img id="trackingBusPhoto" src="../photo/bus.jpg" alt="University bus"></div>  
           <h3 id="trkBus">—</h3>
           <span class="route-code-big" id="trkRoute">—</span>
           <div class="tracking-stat"><span>Current stop</span><strong id="trkCurrent">—</strong></div>
@@ -240,7 +254,7 @@
       </div>
       <div class="bus-details-grid">
         <div class="dashboard-card bus-detail-main">
-          <div class="detail-bus-image"> <img src="../photo/bus.jpg" alt="University bus"></div>     
+          <div class="detail-bus-image"> <img id="detailsBusPhoto" src="../photo/bus.jpg" alt="University bus"></div>     
            <div class="bus-detail-body">
             <span class="small-label" id="busType">—</span>
             <h2 id="busNumber">—</h2>
@@ -328,6 +342,7 @@
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="../JavaScript/api-config.js"></script>
 <script src="../JavaScript/student-dashboard.js"></script>
 </body>
 </html>

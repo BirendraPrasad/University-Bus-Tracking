@@ -4,7 +4,7 @@
    The JWT is read from localStorage ONLY to authenticate requests; it is never a data source.
    The selected trip id is kept in memory only. */
 
-const API_BASE_URL = "http://127.0.0.1:8000";
+const API_BASE_URL = window.API_BASE_URL;
 const LOGIN_PAGE = "login.html";
 // Must match the key(s) your login page writes the JWT to.
 const TOKEN_KEYS = ["token", "access_token", "accessToken", "jwt"];
@@ -58,8 +58,20 @@ function setMsg(id, text, kind) { const el = $(id); if (!el) return; el.textCont
 
 /* ---------- auth + API ---------- */
 class ApiError extends Error { constructor(status, message, detail) { super(message); this.status = status; this.detail = detail; } }
-const getToken = () => { for (const k of TOKEN_KEYS) { const v = localStorage.getItem(k); if (v) return v; } return null; };
-const clearToken = () => TOKEN_KEYS.forEach((k) => localStorage.removeItem(k));
+const getToken = () => {
+  for (const storage of [localStorage, sessionStorage]) {
+    for (const k of TOKEN_KEYS) {
+      const v = storage.getItem(k);
+      if (v) return v;
+    }
+  }
+  return null;
+};
+const clearToken = () => {
+  for (const storage of [localStorage, sessionStorage]) {
+    TOKEN_KEYS.forEach((k) => storage.removeItem(k));
+  }
+};
 const redirectLogin = () => window.location.replace(LOGIN_PAGE);
 function friendly(status, detail) {
   if (status === 403) return "Access denied. This area is for driver accounts only.";
@@ -488,3 +500,23 @@ async function init() {
   renderAll();
 }
 document.addEventListener("DOMContentLoaded", init);
+
+/* ---------- PWA service worker registration ---------- */
+async function registerDriverServiceWorker() {
+  if (!("serviceWorker" in navigator)) {
+    console.warn("Service Worker is not supported by this browser.");
+    return;
+  }
+
+  try {
+    const registration = await navigator.serviceWorker.register(
+      "../service-worker.js",
+      { scope: "../" }
+    );
+    console.log("Driver PWA Service Worker registered:", registration.scope);
+  } catch (error) {
+    console.error("Driver PWA Service Worker registration failed:", error);
+  }
+}
+
+registerDriverServiceWorker();

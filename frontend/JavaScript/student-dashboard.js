@@ -26,7 +26,7 @@
    1. CONFIG
    ========================================================== */
 
-const API_BASE_URL = "http://127.0.0.1:8000";
+const API_BASE_URL = window.API_BASE_URL;
 
 const CONFIG = {
   LOGIN_PAGE: "login.html",
@@ -57,13 +57,18 @@ const CONFIG = {
 
     profile: "/students/me",
 
-    routes: "/students/me/routes",
+    buses: "/students/buses",
+
+    routes: "/students/routes",
 
     routeStops: (routeId) =>
-      `/students/me/routes/${encodeURIComponent(routeId)}/stops`,
+      `/students/routes/${encodeURIComponent(routeId)}/stops`,
 
     routeBus: (routeId) =>
-      `/students/me/routes/${encodeURIComponent(routeId)}/bus`,
+      `/students/routes/${encodeURIComponent(routeId)}/bus`,
+
+   routeLocation: (routeId) =>
+  `/students/routes/${encodeURIComponent(routeId)}/bus/location`,
 
     timetable: "/students/me/timetable",
 
@@ -139,6 +144,8 @@ const state = {
 
   routes: [],
 
+  allBuses: [],
+
   timetable: [],
 
   notifications: [],
@@ -167,18 +174,20 @@ const state = {
 
 function readStorage(keys) {
 
-  for (const key of keys) {
+  for (const store of [localStorage, sessionStorage]) {
 
-    const value = localStorage.getItem(key);
+    for (const key of keys) {
 
-    if (value) {
-      return value;
+      const value = store.getItem(key);
+
+      if (value) {
+        return value;
+      }
     }
   }
 
   return null;
 }
-
 
 function getToken() {
 
@@ -334,6 +343,10 @@ const getStudentProfile = () =>
   apiFetch(CONFIG.ENDPOINTS.profile);
 
 
+const getAllUniversityBuses = () =>
+  apiFetch(CONFIG.ENDPOINTS.buses);
+
+
 const getSubscribedRoutes = () =>
   apiFetch(CONFIG.ENDPOINTS.routes);
 
@@ -341,6 +354,8 @@ const getSubscribedRoutes = () =>
 const getRouteStops = (routeId) =>
   apiFetch(CONFIG.ENDPOINTS.routeStops(routeId));
 
+const getRouteLocation = (routeId) =>
+  apiFetch(CONFIG.ENDPOINTS.routeLocation(routeId));
 
 const getRouteBus = (routeId) =>
   apiFetch(CONFIG.ENDPOINTS.routeBus(routeId));
@@ -718,19 +733,24 @@ function renderRouteStopsOnMap(
     return;
   }
 
-  const coordinates =
-    route.stopsData
-      .filter(
-        (stop) =>
-          typeof stop.latitude === "number" &&
-          typeof stop.longitude === "number"
-      )
-      .map(
-        (stop) => [
-          stop.latitude,
-          stop.longitude
-        ]
-      );
+  // Ignore stops without GPS coordinates (0,0 placeholders).
+  const validStops = route.stopsData.filter(
+    (stop) =>
+      Number.isFinite(stop.latitude) &&
+      Number.isFinite(stop.longitude) &&
+      stop.latitude >= -90 &&
+      stop.latitude <= 90 &&
+      stop.longitude >= -180 &&
+      stop.longitude <= 180 &&
+      !(stop.latitude === 0 && stop.longitude === 0)
+  );
+
+  const coordinates = validStops.map(
+    (stop) => [
+      stop.latitude,
+      stop.longitude
+    ]
+  );
 
   if (!coordinates.length) {
     return;
@@ -772,7 +792,7 @@ function renderRouteStopsOnMap(
        * Create stop markers.
        */
 
-      route.stopsData.forEach(
+      validStops.forEach(
         (stop) => {
 
           const marker =
@@ -791,6 +811,61 @@ function renderRouteStopsOnMap(
           );
         }
       );
+
+
+      /*
+       * Add Devanahalli common reference marker.
+       * This marker is separate from actual bus stops and route line.
+       */
+
+      const devanahalliIcon = L.divIcon({
+        className: "devanahalli-marker-icon",
+        html: `
+          <div style="
+            width: 34px;
+            height: 34px;
+            background: linear-gradient(135deg, #38bdf8, #2563eb);
+            border: 3px solid #ffffff;
+            border-radius: 50% 50% 50% 0;
+            transform: rotate(-45deg);
+            box-shadow: 0 3px 12px rgba(37, 99, 235, 0.55);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          ">
+            <div style="
+              width: 10px;
+              height: 10px;
+              background: #ffffff;
+              border-radius: 50%;
+            "></div>
+          </div>
+        `,
+        iconSize: [40, 40],
+        iconAnchor: [17, 38],
+        popupAnchor: [0, -38]
+      });
+
+      const devanahalliMarker = L.marker(
+        [13.244561, 77.713652],
+        { icon: devanahalliIcon, title: "Devanahalli" }
+      )
+        .addTo(map)
+        .bindPopup(`
+          <div style="min-width: 180px;">
+            <strong style="font-size: 15px; color: #2563eb;">
+              Devanahalli
+            </strong>
+            <div style="margin-top: 5px;">
+              Common Reference Point
+            </div>
+            <small style="color: #64748b;">
+              13.244561, 77.713652
+            </small>
+          </div>
+        `);
+
+      state.stopMarkers[key].push(devanahalliMarker);
 
 
       /*
@@ -815,7 +890,9 @@ function renderRouteStopsOnMap(
 
         map.fitBounds(
           L.latLngBounds(
-            coordinates
+            coordinates.concat([
+              [13.244561, 77.713652]
+            ])
           ),
           {
             padding: [
@@ -1016,6 +1093,39 @@ function updateNextStop(
 }
 
 
+function setBusPhotos(route) {
+  if (!route) return;
+
+  const bus = route.busData || {};
+  const photoPath =
+    route.front_photo ||
+    bus.front_photo ||
+    route.side_photo ||
+    bus.side_photo ||
+    null;
+
+  const fallback = "../photo/bus.jpg";
+
+  [
+    "dashboardBusPhoto",
+    "trackingBusPhoto",
+    "detailsBusPhoto"
+  ].forEach((id) => {
+    const img = $(id);
+    if (!img) return;
+
+    img.onerror = () => {
+      img.onerror = null;
+      img.src = fallback;
+    };
+
+    img.src = photoPath
+      ? API_BASE_URL + photoPath
+      : fallback;
+  });
+}
+
+
 function updateBusInfo(
   busData
 ) {
@@ -1121,79 +1231,92 @@ function updateBusInfo(
 }
 
 
-/*
- * GPS polling is currently disabled.
- *
- * This prevents requests such as:
- *
- * /buses/undefined/location
- *
- * until the Driver GPS API is ready.
- */
+
 
 async function pollLiveLocation() {
+  const route = state.activeRoute;
 
-  const route =
-    state.activeRoute;
-
-  if (!route) {
+  if (!route || !route.id) {
     return;
   }
 
+  try {
+    const data = await getRouteLocation(route.id);
+    const location = data?.last_location;
 
-  /*
-   * Check whether a real GPS endpoint
-   * has been implemented.
-   */
-
-  if (!route.gps_available) {
-
-    setText(
-      "mapUpdated",
-      "Waiting for driver GPS"
-    );
-
-    setText(
-      "trkMessage",
-      "Live GPS will appear when the driver starts sharing location"
-    );
-
-    const liveDot =
-      $("liveDot");
-
-    if (liveDot) {
-      liveDot.classList.remove("on");
+    if (
+      !location ||
+      typeof location.latitude !== "number" ||
+      typeof location.longitude !== "number"
+    ) {
+      setText("mapUpdated", "Waiting for GPS location");
+      setText("trkMessage", "GPS location not available");
+      return;
     }
 
-    return;
+    // Show the latest location received from backend.
+    updateBusLocation(
+      location.latitude,
+      location.longitude,
+      false
+    );
+
+    // Check whether the GPS record is fresh.
+    const recordedAt = new Date(location.recorded_at);
+    const ageInSeconds =
+      (Date.now() - recordedAt.getTime()) / 1000;
+
+    const isFresh =
+      Number.isFinite(ageInSeconds) &&
+      ageInSeconds >= 0 &&
+      ageInSeconds <= 30;
+
+    const liveDot = $("liveDot");
+    const trackingMessage = $("trkMessage");
+
+    if (liveDot) {
+      liveDot.classList.toggle("on", isFresh);
+    }
+
+    if (trackingMessage) {
+      trackingMessage.classList.toggle("on", isFresh);
+    }
+
+    if (isFresh) {
+      setText("trkMessage", "Live GPS received");
+      setText("mapUpdated", "GPS updated recently");
+    } else {
+      setText("trkMessage", "Showing last known GPS location");
+      setText("mapUpdated", "GPS data is not recent");
+    }
+
+  } catch (error) {
+    console.warn("GPS polling failed:", error.message);
+    setText("trkMessage", "Waiting for GPS location");
   }
-
-
-  /*
-   * Future GPS implementation goes here.
-   */
-
-  console.log(
-    "GPS endpoint is not implemented yet."
-  );
 }
 
 
 function startLivePolling() {
-
-  clearInterval(
-    state.pollTimer
-  );
-
-
-  /*
-   * Do NOT poll until GPS API exists.
-   *
-   * This removes repeated 404 requests.
-   */
+  clearInterval(state.pollTimer);
 
   state.pollTimer = null;
+
+  if (!state.activeRoute || !state.activeRoute.id) {
+    return;
+  }
+
+  pollLiveLocation();
+
+  state.pollTimer = setInterval(
+    pollLiveLocation,
+    CONFIG.LIVE_POLL_MS
+  );
 }
+
+
+
+
 
 
 /* ==========================================================
@@ -1410,7 +1533,7 @@ function renderDashRoutes() {
 
                   <div class="route-bus-image">
                     <img
-                      src="../images/university-bus.jpg"
+                      src="${esc((route.front_photo || route.side_photo) ? API_BASE_URL + (route.front_photo || route.side_photo) : "../images/university-bus.jpg")}"
                       alt=""
                     >
                   </div>
@@ -1510,7 +1633,7 @@ function routeCardHTML(route) {
       <div class="large-bus-photo">
 
         <img
-          src="../images/university-bus.jpg"
+          src="${esc((route.front_photo || route.side_photo) ? API_BASE_URL + (route.front_photo || route.side_photo) : "../images/university-bus.jpg")}"
           alt="${esc(route.name)}"
         >
 
@@ -1665,6 +1788,7 @@ function routeCardHTML(route) {
               <button
                 class="primary-btn route-track-btn"
                 data-open-page="tracking"
+                data-route-id="${esc(route.id)}"
                 type="button"
               >
                 Track live bus
@@ -2317,6 +2441,8 @@ function pickActiveRoute() {
     });
 
 
+    setBusPhotos(state.activeRoute);
+
     renderRouteStopsOnMap(
       state.activeRoute
     );
@@ -2324,9 +2450,57 @@ function pickActiveRoute() {
 }
 
 
+/* ---------- All University Buses Gallery ---------- */
+
+function renderUniversityBuses() {
+  const grid = $("allUniversityBusesGrid");
+  const count = $("allBusesCount");
+
+  if (!grid) return;
+
+  const buses = state.allBuses || [];
+
+  if (count) {
+    count.textContent = `${buses.length} Buses`;
+  }
+
+  if (!buses.length) {
+    grid.innerHTML = emptyState("No university buses available.");
+    return;
+  }
+
+  grid.innerHTML = buses.map((bus) => {
+    const photo = bus.front_photo || bus.side_photo;
+    const photoUrl = photo
+      ? API_BASE_URL + photo
+      : "../photo/bus.jpg";
+
+    return `
+      <article class="university-bus-card">
+        <img
+          class="university-bus-card-photo"
+          src="${esc(photoUrl)}"
+          alt="${esc(bus.bus_number || "University bus")}"
+          loading="lazy"
+          onerror="this.onerror=null;this.src='../photo/bus.jpg';"
+        >
+        <div class="university-bus-card-body">
+          <h3>${esc(bus.bus_number || "Bus")}</h3>
+          <span class="bus-type-label">${esc(bus.bus_type || "University Bus")}</span>
+          <p>Registration: ${esc(bus.registration_number || "Not available")}</p>
+          <p>Capacity: ${esc(bus.capacity ?? "Not available")}</p>
+        </div>
+      </article>
+    `;
+  }).join("");
+}
+
+
 /* ---------- Render everything ---------- */
 
 function renderAll() {
+
+  renderUniversityBuses();
 
   renderHeader();
 
@@ -2686,6 +2860,26 @@ function bindEvents() {
 
       if (opener) {
 
+        if (opener.classList.contains("route-track-btn")) {
+          const selectedRoute = state.routes.find(
+            route => String(route.id) === String(opener.dataset.routeId)
+          );
+
+          if (selectedRoute) {
+            state.activeRoute = selectedRoute;
+            updateBusInfo({
+              bus_number: selectedRoute.bus_number,
+              route_code: selectedRoute.code,
+              status: selectedRoute.status,
+              current_stop: selectedRoute.current_stop,
+              next_stop: selectedRoute.next_stop,
+              eta_minutes: selectedRoute.eta_minutes
+            });
+            renderRouteStopsOnMap(selectedRoute);
+            startLivePolling();
+          }
+        }
+
         showSection(
           opener.dataset.openPage
         );
@@ -2988,7 +3182,7 @@ function normalizeBus(
   route
 ) {
 
-  if (!busData) {
+  if (!busData || busData.bus_assigned === false) {
     return null;
   }
 
@@ -3135,7 +3329,10 @@ async function buildRouteFromBackend(
       route.route_id,
 
     type:
-      "route",
+      (
+        busData?.bus_type === "SHUTTLE_BUS" ||
+        /shuttle/i.test(route.route_name || "")
+      ) ? "shuttle" : "route",
 
     code:
       route.route_code,
@@ -3152,6 +3349,14 @@ async function buildRouteFromBackend(
 
     bus_number:
       busData?.bus_number ||
+      null,
+
+    front_photo:
+      busData?.front_photo ||
+      null,
+
+    side_photo:
+      busData?.side_photo ||
       null,
 
     busData,
@@ -3264,6 +3469,18 @@ async function loadDashboardData() {
       "Student profile failed:",
       error.message
     );
+  }
+
+
+  /*
+   * Load all university buses for the student gallery.
+   */
+
+  try {
+    state.allBuses = await getAllUniversityBuses();
+  } catch (error) {
+    console.error("All university buses failed:", error.message);
+    state.allBuses = [];
   }
 
 

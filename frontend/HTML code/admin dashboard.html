@@ -8,6 +8,7 @@
   <meta name="robots" content="noindex">
   <link rel="stylesheet" href="../CSS/admin-dashboard.css">
   <!-- <link rel="stylesheet" href="../CSS/admin-dashboard.css"> -->
+<script src="../JavaScript/api-config.js" defer></script>
   <script src="../JavaScript/admin-dashboard.js" defer></script>
   <script src="../JavaScript/admin-shell.js" defer></script>
 
@@ -33,13 +34,59 @@
         <div class="user-chip">
           <span class="avatar" id="userAvatar" aria-hidden="true">A</span>
           <span class="user-chip__meta"><strong id="userName">Administrator</strong><span id="userRole">Admin</span></span>
+
+          <div class="notification-wrapper">
+            <button
+              class="btn btn--icon notification-btn"
+              type="button"
+              id="notificationBtn"
+              aria-label="Notifications"
+              aria-expanded="false"
+              aria-controls="notificationPanel"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/>
+                <path d="M10 21h4"/>
+              </svg>
+              <span class="notification-count" id="notificationCount" hidden>0</span>
+            </button>
+
+            <div
+              class="notification-panel"
+              id="notificationPanel"
+              hidden
+            >
+              <div class="notification-panel__head">
+                <strong>Notifications</strong>
+                <span id="notificationUnreadText">No unread notifications</span>
+              </div>
+
+              <div
+                class="notification-list"
+                id="notificationList"
+                aria-live="polite"
+              >
+                <p class="notification-empty">Loading notifications...</p>
+              </div>
+
+              <a href="#drivers" class="notification-footer">
+                View driver requests
+              </a>
+            </div>
+          </div>
+          
           <button class="btn btn--sm" type="button" id="signOutBtn"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 4H5v16h4M16 8l4 4-4 4M20 12H9"/></svg>Sign out</button>
         </div>
       </header>
 
       <main class="content" id="main" tabindex="-1">
         <div class="stage-banner" role="note"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 8v.5M12 11v5"/></svg>
-          <div><strong>Stage 5: read-only integration.</strong> Overview, Users, Buses, Drivers and Routes load live data from the existing API. Sections marked <strong>Pending</strong> need backend endpoints that do not exist yet and show no data. Creating and editing records is not connected yet.
+          
+          
+          <div>
+            <strong>Stage 5: API integration.</strong>Overview, Users, Buses, Drivers, Routes, Students and Faculty load live data from the backend API.Trips, Live Map and Bulk Import are still pending integration.
+
+
             <div class="legend"><span class="chip chip--api">Connected</span><span class="chip chip--new">Pending: endpoint to add</span><span class="chip chip--ph">Pending: not connected</span></div>
           </div>
         </div>
@@ -102,6 +149,7 @@
               <tr>
                 <th>Bus Number</th>
                 <th>Type</th>
+                <th>Assigned Route</th>
                 <th>Capacity</th>
                 <th>Registration</th>
                 <th>Driver</th>
@@ -122,6 +170,44 @@
         <div><h2>Drivers</h2><p>Driver accounts, licences and assigned buses.</p><div class="legend"><span class="chip chip--api">List: connected</span><span class="chip chip--new">Detail, edit: to add</span></div></div>
         <div class="page-actions"><button class="btn btn--primary" type="button" data-open-dialog="dlg-driver"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>Add driver</button></div>
       </div>
+     
+      <!-- PENDING DRIVER REGISTRATION REQUESTS -->
+      <section class="card">
+          <div class="card__head">
+              <h3>Pending Driver Requests</h3>
+              <button
+                  class="btn btn--sm"
+                  type="button"
+                  id="refreshDriverRequestsBtn"
+              >
+                  Refresh Requests
+              </button>
+          </div>
+
+          <div class="table-wrap">
+              <table class="data">
+                  <thead>
+                      <tr>
+                          <th>Name</th>
+                          <th>Email</th>
+                          <th>License Number</th>
+                          <th>Phone</th>
+                          <th>Request Date</th>
+                          <th>Status</th>
+                          <th>Actions</th>
+                      </tr>
+                  </thead>
+                  <tbody id="pendingDriverRequestsBody">
+                      <tr>
+                          <td colspan="7">Loading requests...</td>
+                      </tr>
+                  </tbody>
+              </table>
+          </div>
+      </section>
+
+
+
       <section class="card"><div class="toolbar" role="search"><div class="field field--search"><label for="drv-search">Search</label><input class="input" id="drv-search" type="search" placeholder="Name, email or licence number"></div></div>
         <div class="table-wrap">
           <table class="data" id="tbl-drivers" aria-label="Drivers">
@@ -152,7 +238,7 @@
         <section class="card" aria-labelledby="st-h"><div class="card__head"><h3 id="st-h">Stops <span id="stopsRouteName" class="muted"></span></h3><button class="btn btn--sm" type="button" data-open-dialog="dlg-stop"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>Add stop</button></div>
           <div class="table-wrap">
           <table class="data" id="tbl-stops" aria-label="Stops">
-            <thead><tr><th scope="col" class=num>Order</th><th scope="col">Stop</th><th scope="col">Latitude</th><th scope="col">Longitude</th></tr></thead>
+            <thead><tr><th scope="col" class="num">Order</th><th scope="col">Stop</th><th scope="col">Latitude</th><th scope="col">Longitude</th><th scope="col">Pickup Time</th><th scope="col">Drop Time</th><th scope="col">Actions</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
@@ -163,12 +249,12 @@
     </section>
     <section class="view" id="view-trips" data-title="Trips" data-desc="Scheduled, active, completed and cancelled trips." hidden>
       <div class="page-head">
-        <div><h2>Trips</h2><p>Scheduled, active, completed and cancelled trips.</p><div class="legend"><span class="chip chip--api">Create: API exists, not connected yet</span><span class="chip chip--new">List and filters: to add</span></div></div>
+        <div><h2>Trips</h2><p>Scheduled, active, completed and cancelled trips.</p><div class="legend"><span class="chip chip--api">Create: API exists, not connected yet</span><span class="chip chip--api">List and filters: connected</span></div></div>
         <div class="page-actions"><button class="btn btn--primary" type="button" data-open-dialog="dlg-trip"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>Create trip</button></div>
       </div>
-      <div class="pending-note" role="note"><strong>Pending.</strong> There is no trip list endpoint yet, so no trips can be shown. Trip creation exists in the API but is not connected here.</div>
-      <section class="card"><div class="toolbar" role="search"><div class="field field--search"><label for="trip-search">Search</label><input class="input" id="trip-search" type="search" placeholder="Trip ID, bus or route" disabled></div><div class="field"><label for="trip-status">Status</label><select class="select" id="trip-status" disabled><option value="">All statuses</option><option>SCHEDULED</option><option>ACTIVE</option><option>COMPLETED</option><option>CANCELLED</option></select></div></div>
-        <div class="toolbar" style="border-top:0"><div class="field"><label for="trip-date">Trip date</label><input class="input" id="trip-date" type="date" disabled></div></div>
+      <div class="pending-note" role="status">  <strong>Connected.</strong>  Trip records are loading from the backend API.</div>
+      <section class="card"><div class="toolbar" role="search"><div class="field field--search"><label for="trip-search">Search</label><input class="input" id="trip-search" type="search" placeholder="Trip ID, bus or route"></div><div class="field"><label for="trip-status">Status</label><select class="select" id="trip-status"><option value="">All statuses</option><option>SCHEDULED</option><option>ACTIVE</option><option>COMPLETED</option><option>CANCELLED</option></select></div></div>
+        <div class="toolbar" style="border-top:0"><div class="field"><label for="trip-date">Trip date</label><input class="input" id="trip-date" type="date"></div></div>
         <div class="table-wrap">
           <table class="data" id="tbl-trips" aria-label="Trips">
             <thead><tr><th scope="col">Trip</th><th scope="col">Bus</th><th scope="col">Route</th><th scope="col">Driver</th><th scope="col">Date</th><th scope="col">Status</th></tr></thead>
@@ -185,7 +271,7 @@
         <div class="page-actions"></div>
       </div>
       <section class="card"><div class="toolbar" role="search"><div class="field field--search"><label for="usr-search">Search</label><input class="input" id="usr-search" type="search" placeholder="Name or email"></div><div class="field"><label for="usr-role">Role</label><select class="select" id="usr-role"><option value="">All roles</option><option>ADMIN</option><option>DRIVER</option><option>FACULTY</option><option>STUDENT</option></select></div></div>
-        <div class="table-wrap"><table class="data" id="tbl-users" aria-label="Users"><thead><tr><th scope="col" class="num">ID</th><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Role</th><th scope="col">Status</th></tr></thead><tbody></tbody></table></div>
+        <div class="table-wrap"><table class="data" id="tbl-users" aria-label="Users"><thead><tr><th scope="col" class="num">ID</th><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Role</th> <th scope="col">Status</th> <th scope="col">Actions</th></tr></thead><tbody></tbody></table></div>
         <div class="pagination"><span>Showing 0 of 0</span><div class="pagination__controls"><button class="btn btn--sm" type="button" disabled>Previous</button><button class="btn btn--sm" type="button" disabled>Next</button></div></div></section>
     </section>
     <section class="view" id="view-students" data-title="Students" data-desc="Student accounts and profiles." hidden>
@@ -193,8 +279,12 @@
         <div><h2>Students</h2><p>Student accounts and profiles.</p><div class="legend"><span class="chip chip--new">List: to add</span><span class="chip chip--api">Create: API exists, not connected yet</span></div></div>
         <div class="page-actions"><button class="btn btn--primary" type="button" data-open-dialog="dlg-student"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>Add student</button></div>
       </div>
-      <div class="pending-note" role="note"><strong>Pending.</strong> There is no student list endpoint yet. Student accounts can be seen in All Users. Student profile details (enrolment, department, semester) are pending.</div>
-      <section class="card"><div class="toolbar" role="search"><div class="field field--search"><label for="stu-search">Search</label><input class="input" id="stu-search" type="search" placeholder="Name, email or enrolment number" disabled></div><div class="field"><label for="stu-dept">Department</label><select class="select" id="stu-dept" disabled><option value="">All departments</option></select></div><div class="field"><label for="stu-sem">Semester</label><select class="select" id="stu-sem" disabled><option value="">All semesters</option></select></div></div>
+      <div class="pending-note" role="note">
+        <strong>Connected.</strong>
+        Student records are loading from the backend API. Profile details include enrolment number, department and semester.
+      </div>     
+ <section class="card"><div class="toolbar" role="search"><div class="field field--search"><label for="stu-search">Search</label>
+       <input class="input" id="stu-search" type="search" placeholder="Name, email or enrolment number"></div><div class="field"><label for="stu-dept">Department</label><select class="select" id="stu-dept" ><option value="">All departments</option></select></div><div class="field"><label for="stu-sem">Semester</label><select class="select" id="stu-sem"><option value="">All semesters</option></select></div></div>
         <div class="table-wrap">
           <table class="data" id="tbl-students" aria-label="Students">
             <thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Enrolment no.</th><th scope="col">Department</th><th scope="col">Semester</th><th scope="col">Status</th></tr></thead>
@@ -211,7 +301,7 @@
         <div class="page-actions"><button class="btn btn--primary" type="button" data-open-dialog="dlg-faculty"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>Add faculty</button></div>
       </div>
       <div class="pending-note" role="note"><strong>Pending.</strong> There is no faculty list endpoint yet. Faculty accounts can be seen in All Users. Faculty profile details are pending.</div>
-      <section class="card"><div class="toolbar" role="search"><div class="field field--search"><label for="fac-search">Search</label><input class="input" id="fac-search" type="search" placeholder="Name, email or employee ID" disabled></div><div class="field"><label for="fac-dept">Department</label><select class="select" id="fac-dept" disabled><option value="">All departments</option></select></div></div>
+      <section class="card"><div class="toolbar" role="search"><div class="field field--search"><label for="fac-search">Search</label><input class="input" id="fac-search" type="search" placeholder="Name, email or employee ID"></div><div class="field"><label for="fac-dept">Department</label><select class="select" id="fac-dept"><option value="">All departments</option></select></div></div>
         <div class="table-wrap">
           <table class="data" id="tbl-faculty" aria-label="Faculty">
             <thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Employee ID</th><th scope="col">Department</th><th scope="col">Status</th></tr></thead>
@@ -271,6 +361,13 @@
         </div>
 
         <div class="field">
+          <label for="bus_route">Assigned Route</label>
+          <select class="select" id="bus_route">
+            <option value="">Select a route</option>
+          </select>
+        </div>
+
+        <div class="field">
           <label for="capacity">Capacity *</label>
           <input class="input" id="capacity" type="number"
             required min="1">
@@ -282,14 +379,18 @@
             type="text" required maxlength="50">
         </div>
 
-        <div class="field">
+        <div class="field bus-photo-upload">
           <label for="front_photo">Front Photo</label>
+          <img id="front_photo_preview" class="bus-photo-preview"
+            alt="Bus front photo preview" hidden>
           <input class="input" id="front_photo" type="file"
             accept=".jpg,.jpeg,.png,.webp">
         </div>
 
-        <div class="field">
+        <div class="field bus-photo-upload">
           <label for="side_photo">Side Photo</label>
+          <img id="side_photo_preview" class="bus-photo-preview"
+            alt="Bus side photo preview" hidden>
           <input class="input" id="side_photo" type="file"
             accept=".jpg,.jpeg,.png,.webp">
         </div>
@@ -318,21 +419,23 @@
     </form>
   </dialog>
   <dialog id="dlg-student" aria-labelledby="dlg-student-t">
-    <form method="dialog" novalidate>
+    <form id="studentForm" novalidate>
       <div class="dialog__head"><h2 id="dlg-student-t">Add student</h2>
+
         <button class="btn btn--ghost btn--icon" type="button" data-close-dialog aria-label="Close dialog"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
-      <div class="dialog__body">
+      
+        <div class="dialog__body">
         <p class="note">Pending: creating records from the dashboard is not connected yet. This form is a layout preview only.</p>
         <div class="form-grid"><div class="field"><label for="s_name">Full name <span class="req" aria-hidden="true">*</span></label><input class="input" id="s_name" name="s_name" type="text" required maxlength="100"></div><div class="field"><label for="s_email">Email <span class="req" aria-hidden="true">*</span></label><input class="input" id="s_email" name="s_email" type="email" required maxlength="150" autocomplete="off"></div><div class="field"><label for="s_password">Temporary password <span class="req" aria-hidden="true">*</span></label><input class="input" id="s_password" name="s_password" type="password" required aria-describedby="s_password-hint" autocomplete="new-password" minlength="8"><span class="hint" id="s_password-hint">Hashed by the backend. Never stored in the browser.</span></div><div class="field"><label for="enrollment_no">Enrolment number <span class="req" aria-hidden="true">*</span></label><input class="input" id="enrollment_no" name="enrollment_no" type="text" required maxlength="50"></div><div class="field"><label for="s_department">Department <span class="req" aria-hidden="true">*</span></label><input class="input" id="s_department" name="s_department" type="text" required maxlength="100"></div><div class="field"><label for="semester">Semester <span class="req" aria-hidden="true">*</span></label><input class="input" id="semester" name="semester" type="number" required min="1" max="12" step="1" inputmode="numeric"></div></div>
       </div>
       <div class="dialog__foot">
         <button class="btn" type="button" data-close-dialog>Cancel</button>
-        <button class="btn btn--primary" type="submit" disabled aria-disabled="true">Save (pending)</button>
+        <button class="btn btn--primary" type="submit">Save Student</button>
       </div>
     </form>
   </dialog>
   <dialog id="dlg-faculty" aria-labelledby="dlg-faculty-t">
-    <form method="dialog" novalidate>
+    <form id="facultyForm" novalidate>
       <div class="dialog__head"><h2 id="dlg-faculty-t">Add faculty</h2>
         <button class="btn btn--ghost btn--icon" type="button" data-close-dialog aria-label="Close dialog"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
       <div class="dialog__body">
@@ -341,7 +444,7 @@
       </div>
       <div class="dialog__foot">
         <button class="btn" type="button" data-close-dialog>Cancel</button>
-        <button class="btn btn--primary" type="submit" disabled aria-disabled="true">Save (pending)</button>
+        <button class="btn btn--primary" type="submit">Save Faculty</button>
       </div>
     </form>
   </dialog>
@@ -365,7 +468,7 @@
         <button class="btn btn--ghost btn--icon" type="button" data-close-dialog aria-label="Close dialog"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
       <div class="dialog__body">
         <p class="note">Add a stop to the selected route.</p>
-        <div class="form-grid"><div class="field span-2"><label for="stop_route">Route <span class="req" aria-hidden="true">*</span></label><select class="select" id="stop_route" name="stop_route" required><option value="">Pending: not connected yet</option></select></div><div class="field span-2"><label for="stop_name">Stop name <span class="req" aria-hidden="true">*</span></label><input class="input" id="stop_name" name="stop_name" type="text" required maxlength="150"></div><div class="field"><label for="latitude">Latitude <span class="req" aria-hidden="true">*</span></label><input class="input" id="latitude" name="latitude" type="number" required aria-describedby="latitude-hint" min="-90" max="90" step="any"><span class="hint" id="latitude-hint">-90 to 90</span></div><div class="field"><label for="longitude">Longitude <span class="req" aria-hidden="true">*</span></label><input class="input" id="longitude" name="longitude" type="number" required aria-describedby="longitude-hint" min="-180" max="180" step="any"><span class="hint" id="longitude-hint">-180 to 180</span></div><div class="field"><label for="stop_order">Stop order <span class="req" aria-hidden="true">*</span></label><input class="input" id="stop_order" name="stop_order" type="number" required aria-describedby="stop_order-hint" min="1" step="1"><span class="hint" id="stop_order-hint">Must be unique within the route.</span></div></div>
+        <div class="form-grid"><div class="field span-2"><label for="stop_route">Route <span class="req" aria-hidden="true">*</span></label><select class="select" id="stop_route" name="stop_route" required><option value="">Pending: not connected yet</option></select></div><div class="field span-2"><label for="stop_name">Stop name <span class="req" aria-hidden="true">*</span></label><input class="input" id="stop_name" name="stop_name" type="text" required maxlength="150"></div><div class="field"><label for="latitude">Latitude <span class="req" aria-hidden="true">*</span></label><input class="input" id="latitude" name="latitude" type="number" required aria-describedby="latitude-hint" min="-90" max="90" step="any"><span class="hint" id="latitude-hint">-90 to 90</span></div><div class="field"><label for="longitude">Longitude <span class="req" aria-hidden="true">*</span></label><input class="input" id="longitude" name="longitude" type="number" required aria-describedby="longitude-hint" min="-180" max="180" step="any"><span class="hint" id="longitude-hint">-180 to 180</span></div><div class="field"><label for="stop_order">Stop order <span class="req" aria-hidden="true">*</span></label><input class="input" id="stop_order" name="stop_order" type="number" required aria-describedby="stop_order-hint" min="1" step="1"><span class="hint" id="stop_order-hint">Must be unique within the route.</span></div><div class="field"><label for="stop_pickup_time">Pickup Time</label><input class="input" id="stop_pickup_time" name="pickup_time" type="time"></div><div class="field"><label for="stop_drop_time">Drop Time</label><input class="input" id="stop_drop_time" name="drop_time" type="time"></div></div>
       </div>
       <div class="dialog__foot">
         <button class="btn" type="button" data-close-dialog>Cancel</button>
@@ -373,20 +476,199 @@
       </div>
     </form>
   </dialog>
-  <dialog id="dlg-trip" aria-labelledby="dlg-trip-t">
-    <form method="dialog" novalidate>
-      <div class="dialog__head"><h2 id="dlg-trip-t">Create trip</h2>
-        <button class="btn btn--ghost btn--icon" type="button" data-close-dialog aria-label="Close dialog"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
-      <div class="dialog__body">
-        <p class="note">Pending: creating records from the dashboard is not connected yet. This form is a layout preview only.</p>
-        <div class="form-grid"><div class="field"><label for="trip_bus">Bus <span class="req" aria-hidden="true">*</span></label><select class="select" id="trip_bus" name="trip_bus" required><option value="">Pending: not connected yet</option></select></div><div class="field"><label for="trip_route">Route <span class="req" aria-hidden="true">*</span></label><select class="select" id="trip_route" name="trip_route" required><option value="">Pending: not connected yet</option></select></div><div class="field"><label for="trip_driver">Driver <span class="req" aria-hidden="true">*</span></label><select class="select" id="trip_driver" name="trip_driver" required aria-describedby="trip_driver-hint"><option value="">Pending: not connected yet</option></select><span class="hint" id="trip_driver-hint">Must be the driver assigned to the selected bus.</span></div><div class="field"><label for="trip_date_in">Trip date <span class="req" aria-hidden="true">*</span></label><input class="input" id="trip_date_in" name="trip_date_in" type="date" required ></div></div>
-      </div>
-      <div class="dialog__foot">
-        <button class="btn" type="button" data-close-dialog>Cancel</button>
-        <button class="btn btn--primary" type="submit" disabled aria-disabled="true">Save (pending)</button>
-      </div>
+ <dialog id="dlg-trip" aria-labelledby="dlg-trip-t">
+    <form id="tripForm" novalidate>
+
+        <div class="dialog__head">
+            <h2 id="dlg-trip-t">Create trip</h2>
+
+            <button
+                class="btn btn--ghost btn--icon"
+                type="button"
+                data-close-dialog
+                aria-label="Close dialog"
+            >
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M6 6l12 12M18 6 6 18"/>
+                </svg>
+            </button>
+        </div>
+
+        <div class="dialog__body">
+            <p class="note">
+                Select a bus, its assigned driver, an active route and trip date.
+            </p>
+
+            <div class="form-grid">
+
+                <div class="field">
+                    <label for="trip_bus">
+                        Bus <span class="req" aria-hidden="true">*</span>
+                    </label>
+
+                    <select
+                        class="select"
+                        id="trip_bus"
+                        name="trip_bus"
+                        required
+                    >
+                        <option value="">Select Bus</option>
+                    </select>
+                </div>
+
+                <div class="field">
+                    <label for="trip_route">
+                        Route <span class="req" aria-hidden="true">*</span>
+                    </label>
+
+                    <select
+                        class="select"
+                        id="trip_route"
+                        name="trip_route"
+                        required
+                    >
+                        <option value="">Select Route</option>
+                    </select>
+                </div>
+
+                <div class="field">
+                    <label for="trip_driver">
+                        Driver <span class="req" aria-hidden="true">*</span>
+                    </label>
+
+                    <select
+                        class="select"
+                        id="trip_driver"
+                        name="trip_driver"
+                        required
+                        aria-describedby="trip_driver-hint"
+                    >
+                        <option value="">Select Driver</option>
+                    </select>
+
+                    <span class="hint" id="trip_driver-hint">
+                        Must be the driver assigned to the selected bus.
+                    </span>
+                </div>
+
+                <div class="field">
+                    <label for="trip_date_in">
+                        Trip date <span class="req" aria-hidden="true">*</span>
+                    </label>
+
+                    <input
+                        class="input"
+                        id="trip_date_in"
+                        name="trip_date_in"
+                        type="date"
+                        required
+                    >
+                </div>
+
+            </div>
+        </div>
+
+        <div class="dialog__foot">
+            <button
+                class="btn"
+                type="button"
+                data-close-dialog
+            >
+                Cancel
+            </button>
+
+            <button
+
+                class="btn btn--primary"
+                type="submit"
+            >
+                Save Trip
+            </button>
+        </div>
+
     </form>
-  </dialog>
+</dialog>
+
+
+<!-- EDIT USER DIALOG -->
+<dialog id="dlg-user-edit" aria-labelledby="dlg-user-edit-title">
+  <form id="editUserForm">
+    <div class="dialog__head">
+      <h2 id="dlg-user-edit-title">Edit User</h2>
+      <button class="btn btn--ghost btn--icon"
+              type="button"
+              data-close-dialog
+              aria-label="Close dialog">×</button>
+    </div>
+
+    <div class="dialog__body">
+      <p class="note">Update user account details.</p>
+
+      <input type="hidden" id="edit_user_id">
+      <input type="hidden" id="edit_user_role">
+
+      <div class="form-grid">
+        <div class="field">
+          <label for="edit_name">Full Name</label>
+          <input class="input" id="edit_name"
+                 type="text" required maxlength="100">
+        </div>
+
+        <div class="field">
+          <label for="edit_email">Email</label>
+          <input class="input" id="edit_email"
+                 type="email" required maxlength="150">
+        </div>
+
+        <!-- DRIVER FIELDS -->
+        <div class="field" id="edit-driver-fields" hidden>
+          <label for="edit_license">Licence Number</label>
+          <input class="input" id="edit_license" type="text">
+        </div>
+        <div class="field" id="edit-driver-phone-field" hidden>
+          <label for="edit_phone">Phone</label>
+          <input class="input" id="edit_phone" type="tel">
+        </div>
+
+        <!-- STUDENT FIELDS -->
+        <div class="field" id="edit-student-fields" hidden>
+          <label for="edit_enrollment">Enrollment Number</label>
+          <input class="input" id="edit_enrollment" type="text">
+        </div>
+        <div class="field" id="edit-student-dept-field" hidden>
+          <label for="edit_student_department">Department</label>
+          <input class="input" id="edit_student_department" type="text">
+        </div>
+        <div class="field" id="edit-student-sem-field" hidden>
+          <label for="edit_semester">Semester</label>
+          <input class="input" id="edit_semester"
+                 type="number" min="1" max="12">
+        </div>
+
+        <!-- FACULTY FIELDS -->
+        <div class="field" id="edit-faculty-fields" hidden>
+          <label for="edit_employee">Employee ID</label>
+          <input class="input" id="edit_employee" type="text">
+        </div>
+        <div class="field" id="edit-faculty-dept-field" hidden>
+          <label for="edit_faculty_department">Department</label>
+          <input class="input" id="edit_faculty_department" type="text">
+        </div>
+      </div>
+    </div>
+
+    <div class="dialog__foot">
+      <button class="btn" type="button" data-close-dialog>
+        Cancel
+      </button>
+      <button class="btn btn--primary" type="submit">
+        Update User
+      </button>
+    </div>
+  </form>
+</dialog>
+
+
   <dialog id="dlg-confirm" aria-labelledby="dlg-confirm-t" aria-describedby="dlg-confirm-d">
     <form method="dialog"><div class="dialog__head"><h2 id="dlg-confirm-t">Confirm action</h2></div>
       <div class="dialog__body"><p id="dlg-confirm-d">Destructive actions will ask for confirmation here. No destructive action is connected yet.</p></div>

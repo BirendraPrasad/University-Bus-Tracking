@@ -39,13 +39,15 @@ class BusCreate(BaseModel):
     bus_number: str
     bus_type: Literal["ROUTE_BUS", "SHUTTLE_BUS"]
     capacity: int
-    registration_number: str    
+    registration_number: str
+    route_id: int | None = None
 
 class BusUpdate(BaseModel):
     bus_number: str | None = None
     bus_type: Literal["ROUTE_BUS", "SHUTTLE_BUS"] | None = None
     capacity: int | None = None
     registration_number: str | None = None
+    route_id: int | None = None
     
 class RouteCreate(BaseModel):
     route_name: str
@@ -59,7 +61,27 @@ class StopCreate(BaseModel):
     stop_name: str
     latitude: float
     longitude: float
-    stop_order: int    
+    stop_order: int
+    pickup_time: str | None = None
+    drop_time: str | None = None
+
+
+class RouteUpdate(BaseModel):
+    route_name: str | None = None
+    route_code: str | None = None
+    description: str | None = None
+    start_point: str | None = None
+    end_point: str | None = None
+    is_active: bool | None = None
+
+
+class StopUpdate(BaseModel):
+    stop_name: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    stop_order: int | None = None
+    pickup_time: str | None = None
+    drop_time: str | None = None
 
 class BusAssignDriver(BaseModel):
     driver_id: int
