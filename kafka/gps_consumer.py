@@ -52,6 +52,8 @@
 
 import json
 import os
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 from kafka import KafkaConsumer
 import psycopg
@@ -88,6 +90,22 @@ for message in consumer:
     longitude = data["longitude"]
     speed = data.get("speed")
 
+    # Convert the original GPS timestamp to Asia/Kolkata local time.
+    raw_timestamp = data.get("recorded_at")
+    if raw_timestamp:
+        gps_time = datetime.fromisoformat(
+            raw_timestamp.replace("Z", "+00:00")
+        )
+        if gps_time.tzinfo is None:
+            gps_time = gps_time.replace(tzinfo=timezone.utc)
+    else:
+        gps_time = datetime.now(timezone.utc)
+
+    recorded_at = (
+        gps_time.astimezone(ZoneInfo("Asia/Kolkata"))
+        .replace(tzinfo=None)
+    )
+
     try:
         # Find bus
         cursor.execute(
@@ -107,41 +125,37 @@ for message in consumer:
 
         bus_id = bus[0]
 
-        # Find active trip
+        # Validate the exact trip_id supplied by the GPS producer
+        trip_id = data.get("trip_id")
+        if trip_id is None:
+            print("GPS skipped: message has no trip_id")
+            continue
+
         cursor.execute(
             """
             SELECT trip_id
             FROM trips
-            WHERE bus_id = %s
+            WHERE trip_id = %s
+              AND bus_id = %s
               AND status = 'ACTIVE'
-            ORDER BY trip_id DESC
-            LIMIT 1
             """,
-            (bus_id,)
+            (trip_id, bus_id)
         )
 
         trip = cursor.fetchone()
 
         if not trip:
-            print("No active trip found for:", bus_number)
+            print("GPS skipped: trip is not active or does not belong to this bus")
             continue
 
-        trip_id = trip[0]
-
-        # Save GPS
+        # Save GPS against the exact validated trip
         cursor.execute(
             """
             INSERT INTO bus_locations
-            (trip_id, bus_id, latitude, longitude, speed)
-            VALUES (%s, %s, %s, %s, %s)
+            (trip_id, bus_id, latitude, longitude, speed, recorded_at)
+            VALUES (%s, %s, %s, %s, %s, %s)
             """,
-            (
-                trip_id,
-                bus_id,
-                latitude,
-                longitude,
-                speed
-            )
+            (trip_id, bus_id, latitude, longitude, speed, recorded_at)
         )
 
         conn.commit()

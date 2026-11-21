@@ -9,9 +9,7 @@ class UserCreate(BaseModel):
     role: Literal["STUDENT", "DRIVER", "FACULTY", "ADMIN"]
 
 
-class UserLogin(BaseModel):
-    email: EmailStr
-    password: str
+
 
 class StudentCreate(BaseModel):
     name: str
@@ -88,6 +86,12 @@ class BusAssignDriver(BaseModel):
 
 
 # register
+class UserLogin(BaseModel):
+    email: str
+    password: str
+    route_id: int | None = None
+
+
 class RegisterRequest(BaseModel):
     name: str
     email: EmailStr

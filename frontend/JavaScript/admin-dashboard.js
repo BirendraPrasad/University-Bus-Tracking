@@ -244,7 +244,7 @@ var adminNotifications = [];
 var unreadNotificationCount = 0;
 
 function loadNotifications() {
-  return api("/users/notifications")
+  return api("/notifications/")
     .then(function (result) {
       adminNotifications = result.notifications || [];
       unreadNotificationCount = result.unread_count || 0;
@@ -296,7 +296,7 @@ function renderNotifications() {
     if (!item.is_read) {
       card.addEventListener("click", function () {
         apiMutation(
-          "/users/notifications/" + item.notification_id + "/read",
+          "/notifications//" + item.notification_id + "/read",
           "PATCH"
         ).then(function () {
           return loadNotifications();
@@ -315,7 +315,7 @@ var markAllBtn = el("button", "mark-all-notifications", "Mark All as Read");
 
 markAllBtn.type = "button";
 markAllBtn.addEventListener("click", function () {
-  apiMutation("/users/notifications/read-all", "PATCH")
+  apiMutation("/notifications//read-all", "PATCH")
     .then(function () {
       return loadNotifications();
     })
@@ -1666,6 +1666,335 @@ function updateTripDriver() {
   driverSelect.value = option.value;
 }
 
+
+  /* -------------------------------------------------------- GPS Simulator */
+  function initGpsSimulator() {
+    var busSelect = $("gps-sim-bus");
+    var latInput = $("gps-sim-lat");
+    var lngInput = $("gps-sim-lng");
+    var insideBtn = $("gps-sim-inside");
+    var outsideBtn = $("gps-sim-outside");
+    var statusEl = $("gps-sim-status");
+
+    if (!busSelect || !latInput || !lngInput || !insideBtn || !outsideBtn || !statusEl) return;
+
+    var previousBus = busSelect.value;
+    busSelect.replaceChildren();
+
+    var placeholder = el("option", null, "Select a bus");
+    placeholder.value = "";
+    busSelect.appendChild(placeholder);
+
+    if (status.buses === "ready" && Array.isArray(data.buses)) {
+      data.buses.forEach(function (bus) {
+        if (bus.driver_id == null) return;
+        var option = el("option", null, bus.bus_number);
+        option.value = String(bus.bus_id);
+        busSelect.appendChild(option);
+      });
+    } else if (status.buses === "error") {
+      placeholder.textContent = "Bus list unavailable";
+    } else {
+      placeholder.textContent = "Loading buses...";
+    }
+
+    if (previousBus && busSelect.querySelector('option[value="' + previousBus + '"]')) {
+      busSelect.value = previousBus;
+    }
+
+    function sendLocation(latitude, longitude) {
+      var busId = busSelect.value;
+      if (!busId) {
+        statusEl.textContent = "Please select a bus first.";
+        return;
+      }
+
+      insideBtn.disabled = true;
+      outsideBtn.disabled = true;
+      statusEl.textContent = "Sending simulated GPS location...";
+
+      apiPost("/drivers/admin/gps-simulator/" + encodeURIComponent(busId) + "/location", {
+        latitude: latitude,
+        longitude: longitude,
+        speed: 20
+      }).then(function (result) {
+        var action = result.trip_action || "NONE";
+        statusEl.textContent =
+          "Bus: " + (result.bus_number || busId) +
+          " | " + (result.message || "Location received") +
+          " | Action: " + action +
+          " | Source: " + (result.source || "SIMULATED") +
+          (result.trip_id ? " | Trip ID: " + result.trip_id : "");
+      }).catch(function (error) {
+        statusEl.textContent = "Simulator error: " + ((error && error.message) || "Request failed");
+      }).finally(function () {
+        insideBtn.disabled = false;
+        outsideBtn.disabled = false;
+      });
+    }
+
+    insideBtn.onclick = function () {
+      latInput.value = "13.219992";
+      lngInput.value = "77.753943";
+      sendLocation(13.219992, 77.753943);
+    };
+
+    outsideBtn.onclick = function () {
+      latInput.value = "13.225000";
+      lngInput.value = "77.753943";
+      sendLocation(13.225000, 77.753943);
+    };
+
+    latInput.onchange = function () {
+      // Coordinates can also be edited manually.
+    };
+    lngInput.onchange = function () {
+      // Coordinates can also be edited manually.
+    };
+
+    latInput.onkeydown = lngInput.onkeydown = function (event) {
+      if (event.key === "Enter") {
+        var lat = Number(latInput.value);
+        var lng = Number(lngInput.value);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+          statusEl.textContent = "Enter valid latitude and longitude.";
+          return;
+        }
+        sendLocation(lat, lng);
+      }
+    };
+  }
+
+
+  /* ------------------------------------------------------ schedule management */
+  var scheduleRecords = [];
+  var editingScheduleId = null;
+
+  function scheduleTime(value) {
+    return value ? String(value).slice(0, 5) : "—";
+  }
+
+  function scheduleCell(row, value) {
+    var cell = document.createElement("td");
+    cell.textContent = value == null || value === "" ? "—" : String(value);
+    row.appendChild(cell);
+    return cell;
+  }
+
+  function populateScheduleOptions() {
+    var busSelect = $("schedule_bus");
+    var routeSelect = $("schedule_route");
+    if (!busSelect || !routeSelect) return;
+
+    busSelect.replaceChildren();
+    routeSelect.replaceChildren();
+
+    function addOption(select, value, label) {
+      var option = document.createElement("option");
+      option.value = value;
+      option.textContent = label;
+      select.appendChild(option);
+    }
+
+    addOption(busSelect, "", "Select bus");
+    (data.buses || []).forEach(function (bus) {
+      addOption(busSelect, String(bus.bus_id), bus.bus_number);
+    });
+
+    addOption(routeSelect, "", "Select route");
+    (data.routes || []).forEach(function (route) {
+      if (route.is_active === false) return;
+      addOption(
+        routeSelect,
+        String(route.route_id),
+        route.route_code + " - " + route.route_name
+      );
+    });
+  }
+
+  function renderSchedules() {
+    var tbody = $("tbl-schedules").querySelector("tbody");
+    var search = ($("schedule-search").value || "").trim().toLowerCase();
+    var direction = $("schedule-direction-filter").value;
+
+    tbody.replaceChildren();
+
+    var visible = scheduleRecords.filter(function (item) {
+      var text = [
+        item.bus_number, item.route_name, item.direction,
+        item.day_of_week
+      ].join(" ").toLowerCase();
+
+      return (!search || text.includes(search)) &&
+        (!direction || item.direction === direction);
+    });
+
+    if (!visible.length) {
+      var emptyRow = document.createElement("tr");
+      var emptyCell = document.createElement("td");
+      emptyCell.colSpan = 7;
+      emptyCell.textContent = scheduleRecords.length
+        ? "No schedules match your filters."
+        : "No schedules found.";
+      emptyRow.appendChild(emptyCell);
+      tbody.appendChild(emptyRow);
+    }
+
+    visible.forEach(function (item) {
+      var row = document.createElement("tr");
+      scheduleCell(row, item.bus_number);
+      scheduleCell(row, item.route_name);
+      scheduleCell(row, item.direction);
+      scheduleCell(row, scheduleTime(item.departure_time));
+      scheduleCell(row, scheduleTime(item.arrival_time));
+      scheduleCell(row, item.day_of_week);
+
+      var actions = document.createElement("td");
+      var edit = document.createElement("button");
+      edit.type = "button";
+      edit.className = "btn btn--sm";
+      edit.textContent = "Edit";
+      edit.addEventListener("click", function () {
+        openScheduleEditor(item);
+      });
+
+      var remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "btn btn--sm";
+      remove.textContent = "Delete";
+      remove.style.marginLeft = "6px";
+      remove.addEventListener("click", function () {
+        deleteSchedule(item);
+      });
+
+      actions.appendChild(edit);
+      actions.appendChild(remove);
+      row.appendChild(actions);
+      tbody.appendChild(row);
+    });
+
+    $("schedule-count").textContent =
+      visible.length + " of " + scheduleRecords.length + " schedules";
+  }
+
+  function loadSchedules() {
+    var tbody = $("tbl-schedules").querySelector("tbody");
+    if (tbody) {
+      tbody.replaceChildren();
+      var row = document.createElement("tr");
+      var cell = document.createElement("td");
+      cell.colSpan = 7;
+      cell.textContent = "Loading schedules...";
+      row.appendChild(cell);
+      tbody.appendChild(row);
+    }
+
+    return api("/schedules/").then(function (records) {
+      scheduleRecords = Array.isArray(records) ? records : [];
+      renderSchedules();
+    }).catch(function (error) {
+      if (tbody) {
+        tbody.replaceChildren();
+        var row = document.createElement("tr");
+        var cell = document.createElement("td");
+        cell.colSpan = 7;
+        cell.textContent = "Could not load schedules: " + error.message;
+        row.appendChild(cell);
+        tbody.appendChild(row);
+      }
+      toast("Could not load schedules: " + error.message, "error");
+    });
+  }
+
+  function openScheduleEditor(item) {
+    var form = $("scheduleForm");
+    form.reset();
+    populateScheduleOptions();
+
+    editingScheduleId = item ? item.schedule_id : null;
+
+    $("dlg-schedule-title").textContent =
+      item ? "Edit schedule" : "Add schedule";
+
+    if (item) {
+      $("schedule_bus").value = String(item.bus_id);
+      $("schedule_route").value = String(item.route_id);
+      $("schedule_direction").value = item.direction;
+      $("schedule_day").value = item.day_of_week || "WORKING_DAYS";
+      $("schedule_departure").value = scheduleTime(item.departure_time);
+      $("schedule_arrival").value =
+        item.arrival_time ? scheduleTime(item.arrival_time) : "";
+    }
+
+    $("dlg-schedule").showModal();
+  }
+
+  function deleteSchedule(item) {
+    if (!confirm(
+      "Delete schedule for " + item.bus_number + " on " +
+      item.route_name + " (" + item.direction + ")?"
+    )) return;
+
+    apiMutation(
+      "/schedules/" + encodeURIComponent(item.schedule_id),
+      "DELETE"
+    ).then(function () {
+      toast("Schedule deleted successfully.", "success");
+      return loadSchedules();
+    }).catch(function (error) {
+      toast("Could not delete schedule: " + error.message, "error");
+    });
+  }
+
+  $("addScheduleBtn").addEventListener("click", function () {
+    openScheduleEditor(null);
+  });
+
+  $("schedule-search").addEventListener("input", renderSchedules);
+  $("schedule-direction-filter").addEventListener("change", renderSchedules);
+
+  $("scheduleForm").addEventListener("submit", function (event) {
+    event.preventDefault();
+    var form = event.currentTarget;
+    if (!form.reportValidity()) return;
+
+    var payload = {
+      bus_id: Number($("schedule_bus").value),
+      route_id: Number($("schedule_route").value),
+      departure_time: $("schedule_departure").value,
+      arrival_time: $("schedule_arrival").value || null,
+      day_of_week: $("schedule_day").value,
+      direction: $("schedule_direction").value
+    };
+
+    var saveButton = form.querySelector('button[type="submit"]');
+    saveButton.disabled = true;
+
+    var request = editingScheduleId !== null
+      ? apiMutation(
+          "/schedules/" + encodeURIComponent(editingScheduleId),
+          "PUT",
+          payload
+        )
+      : apiPost("/schedules/", payload);
+
+    request.then(function () {
+      $("dlg-schedule").close();
+      toast(
+        editingScheduleId !== null
+          ? "Schedule updated successfully."
+          : "Schedule created successfully.",
+        "success"
+      );
+      editingScheduleId = null;
+      return loadSchedules();
+    }).catch(function (error) {
+      toast("Could not save schedule: " + error.message, "error");
+    }).finally(function () {
+      saveButton.disabled = false;
+    });
+  });
+
   /* --------------------------------------------------------------- render */
 function renderAll() {
   renderKpis();
@@ -1674,6 +2003,7 @@ function renderAll() {
   renderStopRouteOptions();
   renderBusRouteOptions();
   renderTripOptions();
+  initGpsSimulator();
   Object.keys(tables).forEach(function (k) { tables[k].render(); });
 }
 
@@ -1695,6 +2025,7 @@ function renderAll() {
       stamp.textContent = "Last refreshed " + new Date().toLocaleTimeString();
       if (failed.length) { toast("Could not load: " + failed.join(", ") + ". See the messages on each page.", "error"); }
       if (selectedRouteId !== null) { var r = findRoute(selectedRouteId); if (r) { loadStops(r); } }
+      loadSchedules();
       return failed.length;
     });
   }
@@ -2320,8 +2651,262 @@ if (tripForm) {
 }
 
 
+
+/* ------------------------------------------------------ Live Fleet Map */
+var fleetMap = null;
+var fleetBusLayer = null;
+var fleetRouteLayer = null;
+var fleetRefreshTimer = null;
+
+var fleetBusData = [];
+var fleetSelectedBusId = "";
+
+function fleetFreshness(bus) {
+    if (!bus.recorded_at) return "OFFLINE";
+    var age = Date.now() - new Date(bus.recorded_at).getTime();
+    if (!Number.isFinite(age) || age < 0) return "OFFLINE";
+    if (age <= 60000) return "LIVE";
+    if (age <= 300000) return "STALE";
+    return "OFFLINE";
+}
+
+function updateFleetBusDetails() {
+    var select = $("fleet-bus-select");
+    if (!select) return;
+
+    var bus = fleetBusData.find(function (item) {
+        return String(item.bus_id) === String(fleetSelectedBusId);
+    });
+
+    var fields = {
+        "fleet-detail-number": bus ? bus.bus_number : "—",
+        "fleet-detail-route": bus ? ((bus.route_code || "—") + " - " + (bus.route_name || "—")) : "—",
+        "fleet-detail-driver": bus ? (bus.driver_name || "Not assigned") : "—",
+        "fleet-detail-trip": bus ? (bus.trip_id || "No active trip") : "—",
+        "fleet-detail-source": bus ? (bus.source || "—") : "—",
+        "fleet-detail-lat": bus && bus.latitude != null ? bus.latitude : "—",
+        "fleet-detail-lng": bus && bus.longitude != null ? bus.longitude : "—",
+        "fleet-detail-speed": bus && bus.speed != null ? bus.speed + " km/h" : "—",
+        "fleet-detail-time": bus && bus.recorded_at ? new Date(bus.recorded_at).toLocaleString() : "No GPS record",
+        "fleet-detail-freshness": bus ? fleetFreshness(bus) : "—"
+    };
+
+    Object.keys(fields).forEach(function (id) {
+        var element = $(id);
+        if (element) element.textContent = String(fields[id]);
+    });
+}
+
+function updateFleetBusOptions(buses) {
+    var select = $("fleet-bus-select");
+    if (!select) return;
+
+    var previous = fleetSelectedBusId;
+    select.replaceChildren();
+
+    var placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "Select a bus";
+    select.appendChild(placeholder);
+
+    buses.forEach(function (bus) {
+        var option = document.createElement("option");
+        option.value = String(bus.bus_id);
+        option.textContent = bus.bus_number + (bus.route_code ? " - " + bus.route_code : "");
+        select.appendChild(option);
+    });
+
+    var exists = buses.some(function (bus) {
+        return String(bus.bus_id) === String(previous);
+    });
+
+    fleetSelectedBusId = exists ? previous : "";
+    select.value = fleetSelectedBusId;
+    updateFleetBusDetails();
+}
+
+
+function initFleetMap() {
+    if (fleetMap) return true;
+    if (!window.L || !$("fleet-map")) return false;
+
+    fleetMap = L.map("fleet-map").setView([13.219992, 77.753943], 10);
+
+    var busSelect = $("fleet-bus-select");
+    if (busSelect && !busSelect.dataset.bound) {
+        busSelect.addEventListener("change", function () {
+            fleetSelectedBusId = busSelect.value;
+            updateFleetBusDetails();
+        });
+        busSelect.dataset.bound = "true";
+    }
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: "&copy; OpenStreetMap contributors"
+    }).addTo(fleetMap);
+
+    fleetBusLayer = L.layerGroup().addTo(fleetMap);
+    fleetRouteLayer = L.layerGroup().addTo(fleetMap);
+
+    return true;
+}
+
+function refreshFleetMap() {
+    if (!initFleetMap()) return;
+
+    api("/trips/live-fleet").then(function (buses) {
+        if (!Array.isArray(buses)) throw new Error("Invalid fleet response.");
+
+        fleetBusData = buses;
+        updateFleetBusOptions(buses);
+
+        fleetBusLayer.clearLayers();
+        fleetRouteLayer.clearLayers();
+
+        var bounds = [];
+        var routeIds = {};
+
+        buses.forEach(function (bus) {
+            if (bus.route_id) routeIds[bus.route_id] = true;
+
+            if (bus.latitude === null || bus.longitude === null) return;
+
+            var lat = Number(bus.latitude);
+            var lng = Number(bus.longitude);
+
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+            var age = bus.recorded_at
+                ? Date.now() - new Date(bus.recorded_at).getTime()
+                : Infinity;
+
+            var freshness = age <= 60000 ? "LIVE"
+                : age <= 300000 ? "STALE" : "OFFLINE";
+
+            var color = freshness === "LIVE" ? "#16a34a"
+                : freshness === "STALE" ? "#f59e0b" : "#dc2626";
+
+            var marker = L.circleMarker([lat, lng], {
+                radius: 9,
+                color: "#ffffff",
+                weight: 2,
+                fillColor: color,
+                fillOpacity: 1
+            }).addTo(fleetBusLayer);
+
+            var popup = document.createElement("div");
+            [
+                "Bus: " + bus.bus_number,
+                "Route: " + (bus.route_code || "Not assigned"),
+                "Driver: " + (bus.driver_name || "Not assigned"),
+                "Trip: " + (bus.trip_id || "No active trip"),
+                "Status: " + freshness,
+                "GPS source: " + (bus.source || "Unknown"),
+                "Speed: " + (bus.speed == null ? "N/A" : bus.speed + " km/h"),
+                "Last update: " + (bus.recorded_at || "Unavailable")
+            ].forEach(function (line) {
+                var row = document.createElement("div");
+                row.textContent = line;
+                popup.appendChild(row);
+            });
+
+            marker.bindPopup(popup);
+            bounds.push([lat, lng]);
+        });
+
+        return Promise.all(Object.keys(routeIds).map(function (routeId) {
+            return api("/users/routes/" + encodeURIComponent(routeId) + "/stops")
+                .then(function (stops) {
+                    if (!Array.isArray(stops)) return;
+
+                    function validStopCoordinates(stop) {
+                        var lat = Number(stop.latitude);
+                        var lng = Number(stop.longitude);
+
+                        return stop.latitude != null &&
+                            stop.longitude != null &&
+                            Number.isFinite(lat) &&
+                            Number.isFinite(lng) &&
+                            lat >= 6 && lat <= 38 &&
+                            lng >= 68 && lng <= 98 &&
+                            !(lat === 0 && lng === 0);
+                    }
+
+                    var points = stops
+                        .filter(validStopCoordinates)
+                        .sort(function (a, b) {
+                            return a.stop_order - b.stop_order;
+                        })
+                        .map(function (stop) {
+                            return [Number(stop.latitude), Number(stop.longitude)];
+                        });
+
+                    if (points.length >= 2) {
+                        L.polyline(points, {
+                            color: "#2563eb",
+                            weight: 4,
+                            opacity: 0.65
+                        }).addTo(fleetRouteLayer);
+                    }
+
+                    stops.forEach(function (stop) {
+                        if (!validStopCoordinates(stop)) return;
+
+                        var stopMarker = L.circleMarker(
+                            [Number(stop.latitude), Number(stop.longitude)],
+                            {
+                                radius: 4,
+                                color: "#1d4ed8",
+                                fillColor: "#ffffff",
+                                fillOpacity: 1,
+                                weight: 2
+                            }
+                        );
+
+                        stopMarker.bindTooltip(
+                            String(stop.stop_order) + ". " + String(stop.stop_name)
+                        );
+                        stopMarker.addTo(fleetRouteLayer);
+                    });
+                }).catch(function (error) {
+                    console.warn("Could not load stops for route " + routeId, error);
+                });
+        })).then(function () {
+            fleetMap.invalidateSize();
+
+            var mapSection = $("view-live-map");
+
+            if (mapSection && !mapSection.hidden) {
+                if (bounds.length) {
+                    fleetMap.fitBounds(bounds, {
+                        padding: [40, 40],
+                        maxZoom: 15
+                    });
+                } else {
+                    fleetMap.setView([13.219992, 77.753943], 12);
+                }
+            }
+        });
+    }).catch(function (error) {
+        console.error("Live Fleet Map error:", error);
+        toast("Live Fleet Map could not refresh: " + error.message, "error");
+    });
+}
+
+window.addEventListener("hashchange", function () {
+    window.setTimeout(function () {
+        if (fleetMap) fleetMap.invalidateSize();
+        refreshFleetMap();
+    }, 300);
+});
+
+refreshFleetMap();
+fleetRefreshTimer = window.setInterval(refreshFleetMap, 15000);
+
  renderAll();
 loadAll();
+loadSchedules();
 loadNotifications();
 loadDriverRequests();
 })();

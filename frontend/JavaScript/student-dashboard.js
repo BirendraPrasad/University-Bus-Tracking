@@ -72,7 +72,7 @@ const CONFIG = {
 
     timetable: "/students/me/timetable",
 
-    notifications: "/students/me/notifications"
+    notifications: "/notifications/"
 
     /*
      * Do NOT use:
@@ -490,6 +490,16 @@ const STATUS = {
     cls: "muted"
   },
 
+  gps_offline: {
+    label: "GPS Offline",
+    cls: "warn"
+  },
+
+  gps_live: {
+    label: "GPS Live",
+    cls: "ok"
+  },
+
   completed: {
     label: "Completed",
     cls: "ok"
@@ -500,6 +510,49 @@ const STATUS = {
     cls: "info"
   }
 };
+
+
+const routeDisplayStatus = (route) => {
+  if (route?.gpsOnline === false) {
+    return statusOf("gps_offline");
+  }
+  if (route?.gpsOnline === true) {
+    return statusOf("gps_live");
+  }
+  return statusOf(route?.status);
+};
+
+
+function setRouteGpsStatus(route, isOnline) {
+  if (!route) return;
+
+  route.gpsOnline = isOnline;
+
+  const matchingRoute = state.routes.find(
+    item => String(item.id) === String(route.id)
+  );
+
+  if (matchingRoute) {
+    matchingRoute.gpsOnline = isOnline;
+  }
+
+  const status = routeDisplayStatus(route);
+
+  document.querySelectorAll("[data-route-status-id]").forEach(element => {
+    if (element.dataset.routeStatusId === String(route.id)) {
+      element.className = `status-badge ${status.cls}`;
+      element.textContent = status.label;
+    }
+  });
+
+  ["nextBusStatus", "trkBadge"].forEach(id => {
+    const element = $(id);
+    if (element) {
+      element.className = `status-badge ${status.cls}`;
+      element.textContent = status.label;
+    }
+  });
+}
 
 
 const statusOf = (status) => {
@@ -636,8 +689,8 @@ function createMap(
    * Otherwise use approximate university area.
    */
   const defaultStart = [
-    23.3441,
-    85.3096
+    13.219992,
+    77.753943
   ];
 
   const map = L
@@ -1249,8 +1302,13 @@ async function pollLiveLocation() {
       typeof location.latitude !== "number" ||
       typeof location.longitude !== "number"
     ) {
+      setRouteGpsStatus(route, false);
+      const liveDot = $("liveDot");
+      const trackingMessage = $("trkMessage");
+      if (liveDot) liveDot.classList.remove("on");
+      if (trackingMessage) trackingMessage.classList.remove("on");
       setText("mapUpdated", "Waiting for GPS location");
-      setText("trkMessage", "GPS location not available");
+      setText("trkMessage", "GPS Offline - location not available");
       return;
     }
 
@@ -1270,6 +1328,9 @@ async function pollLiveLocation() {
       Number.isFinite(ageInSeconds) &&
       ageInSeconds >= 0 &&
       ageInSeconds <= 30;
+
+    setRouteGpsStatus(route, isFresh);
+    renderActiveJourneyTimelines();
 
     const liveDot = $("liveDot");
     const trackingMessage = $("trkMessage");
@@ -1292,7 +1353,13 @@ async function pollLiveLocation() {
 
   } catch (error) {
     console.warn("GPS polling failed:", error.message);
-    setText("trkMessage", "Waiting for GPS location");
+    setRouteGpsStatus(route, false);
+    const liveDot = $("liveDot");
+    const trackingMessage = $("trkMessage");
+    if (liveDot) liveDot.classList.remove("on");
+    if (trackingMessage) trackingMessage.classList.remove("on");
+    setText("trkMessage", "GPS Offline - unable to fetch location");
+    setText("mapUpdated", "GPS status unavailable");
   }
 }
 
@@ -1523,9 +1590,7 @@ function renderDashRoutes() {
             (route) => {
 
               const status =
-                statusOf(
-                  route.status
-                );
+                routeDisplayStatus(route);
 
 
               return `
@@ -1547,7 +1612,7 @@ function renderDashRoutes() {
                       </strong>
 
                       <span
-                        class="status-badge ${status.cls}"
+                        class="status-badge ${status.cls}" data-route-status-id="${esc(route.id)}"
                       >
                         ${esc(status.label)}
                       </span>
@@ -1599,9 +1664,7 @@ function renderDashRoutes() {
 function routeCardHTML(route) {
 
   const status =
-    statusOf(
-      route.status
-    );
+    routeDisplayStatus(route);
 
 
   const directionParts =
@@ -1675,7 +1738,7 @@ function routeCardHTML(route) {
 
 
           <span
-            class="status-badge ${status.cls}"
+            class="status-badge ${status.cls}" data-route-status-id="${esc(route.id)}"
           >
             ${esc(status.label)}
           </span>
@@ -2185,6 +2248,104 @@ function renderNotifications() {
 }
 
 
+
+/* ---------- Shared journey timeline ---------- */
+
+function renderJourneyTimeline(route, targetId) {
+  const target = $(targetId);
+  if (!target) return;
+
+  if (!route) {
+    target.innerHTML = emptyState("No route assigned.");
+    return;
+  }
+
+  const stops = Array.isArray(route.stopsData)
+    ? [...route.stopsData].sort(
+        (a, b) => Number(a.stop_order || 0) - Number(b.stop_order || 0)
+      )
+    : [];
+
+  if (!stops.length) {
+    target.innerHTML = emptyState("Route stop timetable is not available.");
+    return;
+  }
+
+  const bus = route.busData || {};
+  const current = String(bus.current_stop || route.current_stop || "").trim().toLowerCase();
+  const next = String(bus.next_stop || route.next_stop || "").trim().toLowerCase();
+
+  const gps = route.gpsOnline === true
+    ? "GPS Live"
+    : route.gpsOnline === false
+      ? "GPS Offline / Stale"
+      : "GPS status unknown";
+
+  const gpsClass = route.gpsOnline === true
+    ? "journey-gps-live"
+    : "journey-gps-muted";
+
+  const rows = stops.map((stop, index) => {
+    const name = stop.stop_name || `Stop ${index + 1}`;
+    const key = String(name).trim().toLowerCase();
+
+    const explicitStatus = String(stop.status || "").toLowerCase();
+    let state = "upcoming";
+    let stateLabel = "Scheduled";
+
+    if (["completed", "complete", "arrived", "reached"].includes(explicitStatus)) {
+      state = "completed";
+      stateLabel = "Completed";
+    } else if (current && key === current) {
+      state = "current";
+      stateLabel = "Current stop";
+    } else if (next && key === next) {
+      state = "next";
+      stateLabel = "Next stop";
+    }
+
+    const pickup = stop.pickup_time || stop.scheduled_pickup_time || "";
+    const drop = stop.drop_time || stop.scheduled_drop_time || "";
+
+    const schedule = [
+      pickup ? `<span>Pickup: ${esc(pickup)}</span>` : "",
+      drop ? `<span>Drop: ${esc(drop)}</span>` : ""
+    ].filter(Boolean).join("");
+
+    const distance = stop.distance_km ?? stop.distance ?? null;
+    const distanceText = distance !== null && distance !== ""
+      ? `<small>${esc(distance)} km</small>`
+      : "";
+
+    return `
+      <div class="journey-item journey-${state}">
+        <div class="journey-time">
+          ${schedule || '<span>Time not available</span>'}
+        </div>
+        <div class="journey-track">
+          <span class="journey-marker"></span>
+          ${index < stops.length - 1 ? '<span class="journey-line"></span>' : ""}
+        </div>
+        <div class="journey-content">
+          <strong>${esc(name)}</strong>
+          <span class="journey-state">${esc(stateLabel)}</span>
+          ${distanceText}
+        </div>
+      </div>`;
+  }).join("");
+
+  target.innerHTML = `
+    <div class="journey-timeline">
+      <div class="journey-gps ${gpsClass}">${esc(gps)}</div>
+      ${rows}
+    </div>`;
+}
+
+function renderActiveJourneyTimelines() {
+  renderJourneyTimeline(state.activeRoute, "trackingJourneyTimeline");
+  renderJourneyTimeline(state.activeRoute, "busJourneyTimeline");
+}
+
 /* ---------- Bus details ---------- */
 
 const infoRow = (
@@ -2206,6 +2367,8 @@ async function renderBusDetails() {
 
   const route =
     state.activeRoute;
+
+  renderActiveJourneyTimelines();
 
 
   if (!route) {
@@ -2446,6 +2609,8 @@ function pickActiveRoute() {
     renderRouteStopsOnMap(
       state.activeRoute
     );
+
+    renderActiveJourneyTimelines();
   }
 }
 
@@ -3426,16 +3591,18 @@ async function loadTimetableSafely() {
 async function loadNotificationsSafely() {
 
   try {
+    const result = await getNotifications();
+    const notifications = Array.isArray(result)
+      ? result
+      : (result.notifications || []);
 
-    return await getNotifications();
+    return notifications.map(notification => ({
+      ...notification,
+      read: notification.is_read ?? notification.read ?? false
+    }));
 
   } catch (error) {
-
-    console.warn(
-      "Notifications API not available yet:",
-      error.message
-    );
-
+    console.warn("Notifications loading failed:", error.message);
     return [];
   }
 }

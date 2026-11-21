@@ -165,3 +165,77 @@ def create_trip(
         raise
     finally:
         conn.close()
+
+
+# Admin: Live fleet map data
+@router.get("/live-fleet")
+def get_live_fleet(current_user: dict = Depends(require_admin)):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT
+                    b.bus_id,
+                    b.bus_number,
+                    b.route_id,
+                    r.route_code,
+                    r.route_name,
+                    b.driver_id,
+                    u.name AS driver_name,
+                    t.trip_id,
+                    t.status,
+                    t.source,
+                    t.start_time,
+                    loc.latitude,
+                    loc.longitude,
+                    loc.speed,
+                    loc.recorded_at
+                FROM buses b
+                LEFT JOIN routes r ON r.route_id = b.route_id
+                LEFT JOIN drivers d ON d.driver_id = b.driver_id
+                LEFT JOIN users u ON u.user_id = d.user_id
+
+                LEFT JOIN LATERAL (
+                    SELECT trip_id, status, source, start_time
+                    FROM trips
+                    WHERE bus_id = b.bus_id
+                      AND status = 'ACTIVE'
+                    ORDER BY trip_id DESC
+                    LIMIT 1
+                ) t ON TRUE
+
+                LEFT JOIN LATERAL (
+                    SELECT latitude, longitude, speed, recorded_at
+                    FROM bus_locations
+                    WHERE bus_id = b.bus_id
+                    ORDER BY recorded_at DESC NULLS LAST, location_id DESC
+                    LIMIT 1
+                ) loc ON TRUE
+
+                ORDER BY b.bus_id
+            """)
+
+            rows = cur.fetchall()
+
+            return [
+                {
+                    "bus_id": row[0],
+                    "bus_number": row[1],
+                    "route_id": row[2],
+                    "route_code": row[3],
+                    "route_name": row[4],
+                    "driver_id": row[5],
+                    "driver_name": row[6],
+                    "trip_id": row[7],
+                    "trip_status": row[8],
+                    "source": row[9],
+                    "start_time": row[10],
+                    "latitude": float(row[11]) if row[11] is not None else None,
+                    "longitude": float(row[12]) if row[12] is not None else None,
+                    "speed": float(row[13]) if row[13] is not None else None,
+                    "recorded_at": row[14]
+                }
+                for row in rows
+            ]
+    finally:
+        conn.close()

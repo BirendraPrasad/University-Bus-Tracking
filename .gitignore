@@ -17,3 +17,24 @@ __pycache__/
 # Temporary files
 _id,
 er_id,
+
+# IDE and build files
+.idea/
+.gradle/
+**/build/
+local.properties
+*.iml
+
+# Local backups and temporary files
+*.backup*
+*.gps_backup
+*.sim-backup
+*.before-*
+*.zip
+backup/
+Bus_Driver-app/backup_before_*/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example

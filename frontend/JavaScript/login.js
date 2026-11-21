@@ -8,9 +8,9 @@ document.addEventListener("DOMContentLoaded", function () {
     // =========================
 
     const rolePages = {
-        STUDENT: "student dashboard.html",
+        STUDENT: "common dashboard.html",
         DRIVER: "driver dashboard.html",
-        FACULTY: "faculty dashboard.html",
+        FACULTY: "common dashboard.html",
         ADMIN: "admin dashboard.html"
     };
 

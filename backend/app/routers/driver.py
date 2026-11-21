@@ -1,11 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+from datetime import datetime, timezone
 
-from backend.app.dependencies import get_current_user
+from backend.app.dependencies import get_current_user, require_admin
 from backend.app.database.connection import get_connection
 
 from kafka import KafkaProducer
 import json
+import os
 
 router = APIRouter(prefix="/drivers", tags=["Drivers"])
 
@@ -26,6 +28,7 @@ class LocationIn(BaseModel):
     latitude: float = Field(ge=-90, le=90)
     longitude: float = Field(ge=-180, le=180)
     speed: float | None = Field(default=None, ge=0, le=999)
+    recorded_at: datetime | None = None
 
 
 def _driver_id(cur, user_id):
@@ -93,7 +96,7 @@ def get_my_profile(current_user: dict = Depends(require_driver)):
                 raise HTTPException(status_code=404, detail="Driver profile not found")
             cur.execute("""
                 SELECT bus_id, bus_number, bus_type, capacity, registration_number,
-                front_photo, side_photo
+                front_photo, side_photo, route_id
                 FROM buses
                 WHERE driver_id = %s
                 ORDER BY bus_id
@@ -111,49 +114,190 @@ def get_my_profile(current_user: dict = Depends(require_driver)):
                     "capacity": b[3],
                     "registration_number": b[4],
                     "front_photo": b[5],
-                    "side_photo": b[6]
+                    "side_photo": b[6],
+                    "route_id": b[7]
                 },
             }
     finally:
         conn.close()
 
 
-# Current trip (+ route, ordered stops, latest stored GPS point)
-@router.get("/me/trip")
-def get_my_current_trip(current_user: dict = Depends(require_driver)):
+
+
+# Driver: View assigned route and its ordered stops
+@router.get("/me/route")
+def get_my_assigned_route(current_user: dict = Depends(require_driver)):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
             driver_id = _driver_id(cur, current_user["user_id"])
-            cur.execute(TRIP_SELECT + """
-                WHERE t.driver_id = %s
-                ORDER BY (t.trip_date = CURRENT_DATE) DESC,
-                         CASE t.status WHEN 'ACTIVE' THEN 1 WHEN 'SCHEDULED' THEN 2
-                                       WHEN 'COMPLETED' THEN 3 ELSE 4 END,
-                         t.trip_date DESC, t.trip_id DESC
+
+            cur.execute("""
+                SELECT r.route_id, r.route_name, r.route_code,
+                       r.description, r.start_point, r.end_point,
+                       r.is_active
+                FROM buses b
+                JOIN routes r ON r.route_id = b.route_id
+                WHERE b.driver_id = %s
+                ORDER BY b.bus_id
                 LIMIT 1
             """, (driver_id,))
+
+            route = cur.fetchone()
+
+            if not route:
+                raise HTTPException(
+                    status_code=404,
+                    detail="No route assigned to your bus"
+                )
+
+            cur.execute("""
+                SELECT stop_id, stop_name, latitude, longitude,
+                       stop_order, pickup_time, drop_time
+                FROM stops
+                WHERE route_id = %s
+                ORDER BY stop_order
+            """, (route[0],))
+
+            stops = [
+                {
+                    "stop_id": row[0],
+                    "stop_name": row[1],
+                    "latitude": float(row[2]),
+                    "longitude": float(row[3]),
+                    "stop_order": row[4],
+                    "pickup_time": str(row[5]) if row[5] is not None else None,
+                    "drop_time": str(row[6]) if row[6] is not None else None
+                }
+                for row in cur.fetchall()
+            ]
+
+            return {
+                "route_id": route[0],
+                "route_name": route[1],
+                "route_code": route[2],
+                "description": route[3],
+                "start_point": route[4],
+                "end_point": route[5],
+                "is_active": route[6],
+                "stops": stops
+            }
+    finally:
+        conn.close()
+
+# Current trip (+ route, ordered stops, latest stored GPS point)
+@router.get("/me/trip")
+def get_my_current_trip(
+    trip_id: int | None = None,
+    current_user: dict = Depends(require_driver)
+):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            driver_id = _driver_id(cur, current_user["user_id"])
+
+            if trip_id is not None:
+                cur.execute(
+                    TRIP_SELECT + """
+                    WHERE t.driver_id = %s
+                      AND t.trip_id = %s
+                      AND t.status IN ('SCHEDULED', 'ACTIVE')
+                    LIMIT 1
+                    """,
+                    (driver_id, trip_id)
+                )
+            else:
+                cur.execute(
+                    TRIP_SELECT + """
+                    WHERE t.driver_id = %s
+                      AND t.status = 'ACTIVE'
+                    ORDER BY t.trip_date DESC, t.trip_id DESC
+                    LIMIT 1
+                    """,
+                    (driver_id,)
+                )
+
             t = cur.fetchone()
             if not t:
-                raise HTTPException(status_code=404, detail="No trip assigned to you yet")
+                raise HTTPException(
+                    status_code=404,
+                    detail="No matching trip assigned to you"
+                )
+
             trip = _trip_dict(t)
+
             cur.execute("""
-                SELECT stop_id, stop_name, latitude, longitude, stop_order
-                FROM stops WHERE route_id = %s ORDER BY stop_order
-            """, (t[10],))
-            trip["stops"] = [
-                {"stop_id": s[0], "stop_name": s[1], "latitude": float(s[2]),
-                 "longitude": float(s[3]), "stop_order": s[4]}
-                for s in cur.fetchall()]
+                SELECT
+                    s.stop_id,
+                    s.stop_name,
+                    s.latitude,
+                    s.longitude,
+                    s.stop_order,
+                    s.pickup_time,
+                    s.drop_time,
+                    e.arrival_time,
+                    e.departure_time
+                FROM stops s
+                LEFT JOIN trip_stop_events e
+                    ON e.stop_id = s.stop_id
+                   AND e.trip_id = %s
+                WHERE s.route_id = %s
+                ORDER BY s.stop_order
+            """, (t[0], t[10]))
+
+            trip["stops"] = []
+            for row in cur.fetchall():
+                latitude = float(row[2])
+                longitude = float(row[3])
+
+                tracking_available = (
+                    -90 <= latitude <= 90
+                    and -180 <= longitude <= 180
+                    and (latitude != 0 or longitude != 0)
+                )
+
+                arrival_time = _iso(row[7])
+                departure_time = _iso(row[8])
+
+                if not tracking_available:
+                    stop_status = "Untracked"
+                elif departure_time:
+                    stop_status = "Completed"
+                elif arrival_time:
+                    stop_status = "Arrived"
+                else:
+                    stop_status = "Upcoming"
+
+                trip["stops"].append({
+                    "stop_id": row[0],
+                    "stop_name": row[1],
+                    "latitude": latitude,
+                    "longitude": longitude,
+                    "stop_order": row[4],
+                    "pickup_time": str(row[5]) if row[5] is not None else None,
+                    "drop_time": str(row[6]) if row[6] is not None else None,
+                    "arrival_time": arrival_time,
+                    "departure_time": departure_time,
+                    "status": stop_status,
+                    "tracking_available": tracking_available
+                })
+
             cur.execute("""
-                SELECT latitude, longitude, speed, recorded_at FROM bus_locations
-                WHERE trip_id = %s ORDER BY recorded_at DESC, location_id DESC LIMIT 1
+                SELECT latitude, longitude, speed, recorded_at
+                FROM bus_locations
+                WHERE trip_id = %s
+                ORDER BY recorded_at DESC, location_id DESC
+                LIMIT 1
             """, (t[0],))
+
             loc = cur.fetchone()
             trip["last_location"] = None if not loc else {
-                "latitude": float(loc[0]), "longitude": float(loc[1]),
+                "latitude": float(loc[0]),
+                "longitude": float(loc[1]),
                 "speed": float(loc[2]) if loc[2] is not None else None,
-                "recorded_at": _iso(loc[3])}
+                "recorded_at": _iso(loc[3])
+            }
+
             return trip
     finally:
         conn.close()
@@ -344,7 +488,12 @@ def post_location(
                 "trip_id": trip_id,
                 "latitude": loc.latitude,
                 "longitude": loc.longitude,
-                "speed": loc.speed
+                "speed": loc.speed,
+                "recorded_at": (
+                    loc.recorded_at.isoformat()
+                    if loc.recorded_at
+                    else datetime.now(timezone.utc).isoformat()
+                )
             }
 
             # Send GPS data to Kafka
@@ -367,7 +516,7 @@ def post_location(
     finally:
         conn.close()
 
-        
+
 @router.get("/me/trips/history")
 def trip_history(current_user: dict = Depends(require_driver)):
     conn = get_connection()
@@ -375,7 +524,7 @@ def trip_history(current_user: dict = Depends(require_driver)):
         with conn.cursor() as cur:
             driver_id = _driver_id(cur, current_user["user_id"])
             cur.execute(TRIP_SELECT + """
-                WHERE t.driver_id = %s ORDER BY t.trip_date DESC, t.trip_id DESC LIMIT 50
+                WHERE t.driver_id = %s ORDER BY t.trip_date DESC, t.trip_id DESC
             """, (driver_id,))
             return [_trip_dict(t) for t in cur.fetchall()]
     finally:
@@ -396,3 +545,265 @@ def my_notifications(current_user: dict = Depends(require_driver)):
                     for n in cur.fetchall()]
     finally:
         conn.close()
+
+# Automatic campus geofence trip management
+CAMPUS_LAT = 13.219992
+CAMPUS_LNG = 77.753943
+GEOFENCE_RADIUS_METERS = 150
+
+
+
+def _distance_meters(lat1, lon1, lat2, lon2):
+    from math import radians, sin, cos, asin, sqrt
+    lat1, lon1, lat2, lon2 = map(radians, (lat1, lon1, lat2, lon2))
+    dlat, dlon = lat2 - lat1, lon2 - lon1
+    a = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
+    return 6371000 * 2 * asin(sqrt(a))
+
+
+def _process_geofence_location(bus_id: int, loc: LocationIn, source: str, expected_driver_id=None):
+    """Shared geofence processor for real GPS and admin simulation."""
+    if source not in ("REAL", "SIMULATED"):
+        raise HTTPException(status_code=400, detail="Invalid GPS source")
+
+    state_table = (
+        "bus_geofence_state"
+        if source == "REAL"
+        else "bus_geofence_simulator_state"
+    )
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT bus_id, bus_number, route_id, driver_id
+                FROM buses
+                WHERE bus_id = %s
+                FOR UPDATE
+            """, (bus_id,))
+            bus = cur.fetchone()
+
+            if not bus:
+                raise HTTPException(status_code=404, detail="Bus not found")
+
+            bus_id, bus_number, route_id, driver_id = bus
+
+            if expected_driver_id is not None and driver_id != expected_driver_id:
+                raise HTTPException(status_code=403, detail="This bus is not assigned to your driver account")
+
+            if driver_id is None:
+                raise HTTPException(status_code=409, detail="No driver is assigned to this bus")
+
+            if route_id is None:
+                raise HTTPException(status_code=409, detail="No route is assigned to this bus")
+
+            cur.execute("""
+                SELECT is_active FROM routes WHERE route_id = %s
+            """, (route_id,))
+            route = cur.fetchone()
+
+            if not route or not route[0]:
+                raise HTTPException(status_code=409, detail="The assigned bus route is not active")
+
+            inside = _distance_meters(
+                loc.latitude, loc.longitude, CAMPUS_LAT, CAMPUS_LNG
+            ) <= GEOFENCE_RADIUS_METERS
+
+            cur.execute(f"""
+                SELECT is_inside
+                FROM {state_table}
+                WHERE bus_id = %s
+                FOR UPDATE
+            """, (bus_id,))
+            previous = cur.fetchone()
+
+            if previous is None:
+                cur.execute(f"""
+                    INSERT INTO {state_table}
+                    (bus_id, is_inside, last_latitude, last_longitude)
+                    VALUES (%s, %s, %s, %s)
+                """, (bus_id, inside, loc.latitude, loc.longitude))
+
+                if inside:
+                    conn.commit()
+                    return {
+                        "message": "GPS initialized inside campus",
+                        "bus_number": bus_number,
+                        "inside_campus": True,
+                        "trip_action": "NONE",
+                        "trip_id": None,
+                        "source": source
+                    }
+
+                # First reading outside campus is treated as departure.
+                was_inside = True
+            else:
+                was_inside = previous[0]
+
+            action = "NONE"
+            trip_id = None
+
+            cur.execute("""
+                SELECT trip_id, route_id, source
+                FROM trips
+                WHERE bus_id = %s AND status = 'ACTIVE'
+                ORDER BY trip_id DESC
+                FOR UPDATE
+            """, (bus_id,))
+            active_trips = cur.fetchall()
+
+            # Never let simulation alter a real trip, or vice versa.
+            other_source_trip = next(
+                (row for row in active_trips if row[2] != source), None
+            )
+            if other_source_trip:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Bus has an active {other_source_trip[2]} trip. Stop or complete it before using {source} GPS."
+                )
+
+            active_trip = next(
+                (row for row in active_trips if row[2] == source), None
+            )
+
+            if was_inside and not inside:
+                if active_trip:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="An active trip already exists for this bus."
+                    )
+
+                cur.execute("""
+                    INSERT INTO trips
+                    (bus_id, route_id, driver_id, trip_date, start_time, status, source)
+                    VALUES (%s, %s, %s, CURRENT_DATE, CURRENT_TIMESTAMP, 'ACTIVE', %s)
+                    RETURNING trip_id
+                """, (bus_id, route_id, driver_id, source))
+
+                trip_id = cur.fetchone()[0]
+                action = "TRIP_STARTED"
+
+            elif not was_inside and inside and active_trip:
+                active_trip_id, active_trip_route_id, _ = active_trip
+
+                if active_trip_route_id != route_id:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Active trip route does not match the assigned bus route."
+                    )
+
+                cur.execute("""
+                    UPDATE trips
+                    SET status = 'COMPLETED',
+                        end_time = CURRENT_TIMESTAMP
+                    WHERE trip_id = %s AND status = 'ACTIVE'
+                    RETURNING trip_id
+                """, (active_trip_id,))
+
+                completed = cur.fetchone()
+                if completed:
+                    trip_id = completed[0]
+                    action = "TRIP_COMPLETED"
+
+            cur.execute(f"""
+                UPDATE {state_table}
+                SET is_inside = %s,
+                    last_latitude = %s,
+                    last_longitude = %s,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE bus_id = %s
+            """, (inside, loc.latitude, loc.longitude, bus_id))
+
+            if not inside:
+                cur.execute("""
+                    SELECT trip_id FROM trips
+                    WHERE bus_id = %s
+                      AND driver_id = %s
+                      AND status = 'ACTIVE'
+                      AND source = %s
+                    ORDER BY trip_id DESC
+                    LIMIT 1
+                """, (bus_id, driver_id, source))
+                active = cur.fetchone()
+                if active:
+                    trip_id = active[0]
+
+            conn.commit()
+
+            if trip_id and action != "TRIP_COMPLETED":
+                producer.send("bus-location", value={
+                    "bus_id": bus_number,
+                    "trip_id": trip_id,
+                    "latitude": loc.latitude,
+                    "longitude": loc.longitude,
+                    "speed": loc.speed,
+                    "recorded_at": (
+                        loc.recorded_at.isoformat()
+                        if loc.recorded_at
+                        else datetime.now(timezone.utc).isoformat()
+                    )
+                })
+                producer.flush()
+
+            return {
+                "message": "Geofence location processed",
+                "bus_number": bus_number,
+                "inside_campus": inside,
+                "trip_action": action,
+                "trip_id": trip_id,
+                "source": source
+            }
+
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+@router.post("/me/location")
+def automatic_geofence_location(
+    loc: LocationIn,
+    current_user: dict = Depends(require_driver)
+):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            driver_id = _driver_id(cur, current_user["user_id"])
+
+            cur.execute("""
+                SELECT bus_id
+                FROM buses
+                WHERE driver_id = %s
+                ORDER BY bus_id
+                LIMIT 1
+            """, (driver_id,))
+            bus = cur.fetchone()
+
+            if not bus:
+                raise HTTPException(status_code=404, detail="No bus assigned to this driver")
+
+            bus_id = bus[0]
+    finally:
+        conn.close()
+
+    return _process_geofence_location(
+        bus_id, loc, "REAL", expected_driver_id=driver_id
+    )
+
+
+@router.post("/admin/gps-simulator/{bus_id}/location")
+def simulate_bus_location(
+    bus_id: int,
+    loc: LocationIn,
+    current_user: dict = Depends(require_admin)
+):
+    if os.getenv("GPS_SIMULATOR_ENABLED", "false").strip().lower() != "true":
+        raise HTTPException(
+            status_code=403,
+            detail="GPS Simulator is disabled. Enable GPS_SIMULATOR_ENABLED=true for local testing."
+        )
+
+    return _process_geofence_location(
+        bus_id, loc, "SIMULATED"
+    )

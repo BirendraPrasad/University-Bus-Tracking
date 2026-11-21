@@ -1,3 +1,4 @@
+from datetime import timezone
 from fastapi import APIRouter, Depends, HTTPException
 
 from backend.app.dependencies import get_current_user
@@ -372,7 +373,9 @@ def get_all_route_stops(
                     stop_name,
                     latitude,
                     longitude,
-                    stop_order
+                    stop_order,
+                    pickup_time,
+                    drop_time
                 FROM stops
                 WHERE route_id = %s
                 ORDER BY stop_order
@@ -387,7 +390,9 @@ def get_all_route_stops(
                     "stop_name": stop[2],
                     "latitude": float(stop[3]),
                     "longitude": float(stop[4]),
-                    "stop_order": stop[5]
+                    "stop_order": stop[5],
+                    "pickup_time": str(stop[6]) if stop[6] is not None else None,
+                    "drop_time": str(stop[7]) if stop[7] is not None else None
                 }
                 for stop in stops
             ]
@@ -456,7 +461,9 @@ def get_my_route_stops(
                     stop_name,
                     latitude,
                     longitude,
-                    stop_order
+                    stop_order,
+                    pickup_time,
+                    drop_time
                 FROM stops
                 WHERE route_id = %s
                 ORDER BY stop_order
@@ -471,7 +478,9 @@ def get_my_route_stops(
                     "stop_name": stop[2],
                     "latitude": float(stop[3]),
                     "longitude": float(stop[4]),
-                    "stop_order": stop[5]
+                    "stop_order": stop[5],
+                    "pickup_time": str(stop[6]) if stop[6] is not None else None,
+                    "drop_time": str(stop[7]) if stop[7] is not None else None
                 }
                 for stop in stops
             ]
@@ -768,7 +777,7 @@ def get_any_route_bus_location(
                     "latitude": float(loc[0]),
                     "longitude": float(loc[1]),
                     "speed": float(loc[2]) if loc[2] is not None else None,
-                    "recorded_at": loc[3].isoformat()
+                    "recorded_at": loc[3].replace(tzinfo=timezone.utc).isoformat()
                 }
             }
 
@@ -864,11 +873,52 @@ def get_route_bus_location(
                     "latitude": float(loc[0]),
                     "longitude": float(loc[1]),
                     "speed": float(loc[2]) if loc[2] is not None else None,
-                    "recorded_at": loc[3].isoformat()
+                    "recorded_at": loc[3].replace(tzinfo=timezone.utc).isoformat()
                 }
             }
 
     finally:
         conn.close()
 
-        
+# Logged-in student: View schedules for actively subscribed routes
+@router.get("/me/timetable")
+def get_my_timetable(current_user: dict = Depends(get_current_user)):
+    if current_user["role"] != "STUDENT":
+        raise HTTPException(status_code=403, detail="Student access required")
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT
+                    sc.schedule_id, sc.bus_id, b.bus_number,
+                    sc.route_id, r.route_name, r.route_code,
+                    sc.departure_time, sc.arrival_time,
+                    sc.day_of_week, sc.direction
+                FROM schedules sc
+                JOIN routes r ON r.route_id = sc.route_id
+                LEFT JOIN buses b ON b.bus_id = sc.bus_id
+                WHERE r.is_active = TRUE
+                ORDER BY sc.day_of_week, sc.departure_time, r.route_name
+            """)
+
+            return [
+                {
+                    "schedule_id": row[0],
+                    "bus_id": row[1],
+                    "bus_number": row[2],
+                    "route_id": row[3],
+                    "route_name": row[4],
+                    "route_code": row[5],
+                    "departure_time": row[6].isoformat() if row[6] else None,
+                    "arrival_time": row[7].isoformat() if row[7] else None,
+                    "day_of_week": row[8],
+                    "direction": row[9],
+                    "time": row[6].strftime("%H:%M") if row[6] else None,
+                    "status": "scheduled"
+                }
+                for row in cursor.fetchall()
+            ]
+    finally:
+        conn.close()
+

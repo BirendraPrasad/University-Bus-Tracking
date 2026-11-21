@@ -1,3 +1,4 @@
+﻿from backend.app.routers import notifications
 from fastapi import FastAPI
 from backend.app.database.connection import get_connection
 from backend.app.routers.user import router as user_router
@@ -30,7 +31,8 @@ app.add_middleware(
         "http://127.0.0.1:5500",
         "http://localhost:5500",
         "http://172.21.102.212:5500",
-        "http://10.11.97.212:5500"
+        "http://10.11.97.212:5500",
+        "https://appassets.androidplatform.net"
     ],
     allow_origin_regex=r"^http://(10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2[0-9]|3[01])\.\d{1,3}\.\d{1,3}):5500$",
     allow_credentials=True,
@@ -70,4 +72,6 @@ app.include_router(driver_router)
 app.include_router(trips.router)
 app.include_router(schedules.router)
 app.include_router(faculty_router)
+
+app.include_router(notifications.router)
 

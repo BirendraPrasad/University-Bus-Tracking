@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>University Transport Dashboard | Chanakya University</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="../CSS/common-dashboard.css">
+</head>
+<body>
+
+<!-- Icon sprite: used as <svg class="ic"><use href="#i-NAME"/></svg> -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></symbol>
+  <symbol id="i-route" viewBox="0 0 24 24"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h8a3 3 0 0 0 0-6H8a3 3 0 0 1 0-6h8"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 22s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/></symbol>
+  <symbol id="i-bus" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="15" rx="2"/><path d="M4 11h16M8 21v-3M16 21v-3"/><circle cx="8" cy="14.5" r=".6"/><circle cx="16" cy="14.5" r=".6"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M10 21a2 2 0 0 0 4 0"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></symbol>
+  <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></symbol>
+  <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.5-2.5 2-2.5 3.5M12 17h.01"/></symbol>
+</svg>
+
+<div class="dashboard-layout">
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<!-- ================= SIDEBAR ================= -->
+<aside class="sidebar" id="sidebar" aria-label="Main navigation">
+  <div class="sidebar-brand">
+    <div class="logo-box"><img src="../photo/chanakya-university.svg" alt="Chanakya University"></div>
+    <div class="brand-text"><strong>Chanakya</strong><span>University Transport</span></div>
+  </div>
+
+  <div class="menu-section">
+    <p class="menu-title">Main menu</p>
+    <nav class="sidebar-menu">
+      <a href="#" class="menu-item active" data-page="dashboard"><svg class="ic"><use href="#i-home"/></svg><span>Dashboard</span></a>
+      <a href="#" class="menu-item" data-page="routes"><svg class="ic"><use href="#i-route"/></svg><span>My Routes</span></a>
+      <a href="#" class="menu-item" data-page="tracking"><svg class="ic"><use href="#i-pin"/></svg><span>Live Tracking</span></a>
+      <a href="#" class="menu-item" data-page="bus"><svg class="ic"><use href="#i-bus"/></svg><span>Bus Details</span></a>
+      <a href="#" class="menu-item" data-page="timetable"><svg class="ic"><use href="#i-clock"/></svg><span>Timetable</span></a>
+    </nav>
+  </div>
+
+  <div class="menu-section">
+    <p class="menu-title">Account</p>
+    <nav class="sidebar-menu">
+      <a href="#" class="menu-item" data-page="notifications"><svg class="ic"><use href="#i-bell"/></svg><span>Notifications</span><span class="notification-count" id="navNotifCount" hidden>0</span></a>
+      <a href="#" class="menu-item" data-page="profile"><svg class="ic"><use href="#i-user"/></svg><span>My Profile</span></a>
+      <a href="#" class="menu-item" data-page="settings"><svg class="ic"><use href="#i-gear"/></svg><span>Settings</span></a>
+    </nav>
+  </div>
+
+  <div class="sidebar-bottom">
+    <div class="help-card">
+      <svg class="ic"><use href="#i-help"/></svg>
+      <div><strong>Need help?</strong><span>Contact transport support</span></div>
+    </div>
+    <button class="logout-btn" id="logoutBtn" type="button"><svg class="ic"><use href="#i-logout"/></svg>Logout</button>
+  </div>
+</aside>
+
+<!-- ================= MAIN ================= -->
+<main class="main-area">
+
+  <header class="top-header">
+    <div class="header-left">
+      <button class="mobile-menu-btn" id="mobileMenuBtn" type="button" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false"><svg class="ic"><use href="#i-menu"/></svg></button>
+      <div>
+        <span class="portal-label">Student portal</span>
+        <h1 id="pageTitle">Dashboard</h1>
+      </div>
+    </div>
+
+    <div class="search-box">
+      <svg class="ic"><use href="#i-search"/></svg>
+      <input type="search" id="dashboardSearch" placeholder="Search bus, route code or stop" autocomplete="off" aria-label="Search">
+      <span class="search-shortcut">/</span>
+      <div class="search-results" id="searchResults" hidden></div>
+    </div>
+
+    <div class="header-right">
+      <button class="notification-btn" id="notificationBtn" type="button" aria-label="Open notifications">
+        <svg class="ic"><use href="#i-bell"/></svg><span class="notification-dot" id="notificationDot" hidden></span>
+      </button>
+      <div class="profile-mini" id="profileMini" role="button" tabindex="0" aria-label="Open My Profile">
+       <div class="profile-avatar" id="headerAvatar">S</div>
+        <div class="profile-info">
+         <strong id="headerUserName">Student</strong>
+         <span id="headerUserRole">Student</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="demo-notice" id="demoNotice" hidden>
+    Showing demo data. Live data will appear once the FastAPI backend is connected.
+  </div>
+
+  <section class="dashboard-content">
+
+    <!-- ========== DASHBOARD ========== -->
+    <section id="dashboardSection" class="page-section active">
+      <div class="welcome-banner">
+        <div class="welcome-content">
+          <span class="section-eyebrow">Student dashboard</span>
+          <h2><span id="welcomeGreeting">Welcome</span>, <span id="welcomeName">Student</span></h2>
+          <p>Track your university buses, check routes and see when your bus will arrive.</p>
+          <div class="welcome-meta"><span id="todayDate">Today</span></div>
+        </div>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-icon blue"><svg class="ic"><use href="#i-route"/></svg></div>
+          <div class="stat-content"><span>My Routes</span><strong id="statRoutes">0</strong><small>Subscribed routes</small></div></div>
+        <div class="stat-card"><div class="stat-icon green"><svg class="ic"><use href="#i-bus"/></svg></div>
+          <div class="stat-content"><span>Active Buses</span><strong id="statActive">0</strong><small>Currently running</small></div></div>
+        <div class="stat-card"><div class="stat-icon orange"><svg class="ic"><use href="#i-clock"/></svg></div>
+          <div class="stat-content"><span>Next Arrival</span><strong id="statNext">—</strong><small id="statNextStop">No upcoming bus</small></div></div>
+        <div class="stat-card"><div class="stat-icon purple"><svg class="ic"><use href="#i-check"/></svg></div>
+          <div class="stat-content"><span>Today's Trips</span><strong id="statTrips">0</strong><small>Scheduled trips</small></div></div>
+      </div>
+
+      <div class="main-grid">
+        <div class="dashboard-card map-card">
+          <div class="card-header">
+            <div><span class="card-eyebrow">Live location</span><h3>Bus Tracking</h3></div>
+            <button class="outline-btn" id="fullMapBtn" type="button">View full map</button>
+          </div>
+          <div id="dashboardMap" class="map-container"></div>
+          <div class="map-footer">
+            <div class="live-status"><span class="live-dot" id="liveDot"></span><span id="mapUpdated">Waiting for location</span></div>
+            <span id="mapBusLabel">—</span>
+          </div>
+        </div>
+
+        <div class="dashboard-card bus-card">
+          <div class="card-header">
+            <div><span class="card-eyebrow">Next bus</span><h3>Your Bus</h3></div>
+            <span class="status-badge info" id="nextBusStatus">—</span>
+          </div>
+         <div class="bus-image">
+           <img id="dashboardBusPhoto" src="../photo/bus.jpg" alt="University bus">
+         </div>
+          <div class="bus-information">
+            <div><h2 id="nextBusNumber">—</h2><span class="route-label" id="nextBusRoute">—</span></div>
+            <div class="bus-eta"><strong id="nextBusEta">—</strong><span>Estimated arrival</span></div>
+          </div>
+          <div class="bus-location">
+            <div class="location-icon"><svg class="ic"><use href="#i-pin"/></svg></div>
+            <div><strong id="nextBusStop">—</strong><span>Current stop</span></div>
+          </div>
+          <button class="primary-btn" id="trackBusBtn" type="button">Track live bus<svg class="ic"><use href="#i-arrow"/></svg></button>
+        </div>
+      </div>
+
+      <div class="secondary-grid">
+        <div class="dashboard-card routes-card">
+          <div class="card-header">
+            <div><span class="card-eyebrow">Your transport</span><h3>My Routes</h3></div>
+            <button class="text-btn" data-open-page="routes" type="button">View all</button>
+          </div>
+          <div class="route-list" id="dashRouteList"></div>
+        </div>
+
+        <div class="dashboard-card quick-card">
+          <div class="card-header"><div><span class="card-eyebrow">Shortcuts</span><h3>Quick Actions</h3></div></div>
+          <div class="quick-actions">
+            <button class="quick-action" data-open-page="tracking" type="button"><span class="quick-icon blue"><svg class="ic"><use href="#i-pin"/></svg></span><span>Track bus</span><svg class="ic"><use href="#i-arrow"/></svg></button>
+            <button class="quick-action" data-open-page="routes" type="button"><span class="quick-icon green"><svg class="ic"><use href="#i-route"/></svg></span><span>My routes</span><svg class="ic"><use href="#i-arrow"/></svg></button>
+            <button class="quick-action" data-open-page="timetable" type="button"><span class="quick-icon orange"><svg class="ic"><use href="#i-clock"/></svg></span><span>Timetable</span><svg class="ic"><use href="#i-arrow"/></svg></button>
+            <button class="quick-action" data-open-page="notifications" type="button"><span class="quick-icon purple"><svg class="ic"><use href="#i-bell"/></svg></span><span>Notifications</span><svg class="ic"><use href="#i-arrow"/></svg></button>
+          </div>
+        </div>
+      </div>
+
+      <div class="bottom-grid">
+        <div class="dashboard-card timetable-card">
+          <div class="card-header">
+            <div><span class="card-eyebrow">Today</span><h3>Upcoming Trips</h3></div>
+            <button class="text-btn" data-open-page="timetable" type="button">Full timetable</button>
+          </div>
+          <div class="timeline" id="dashTrips"></div>
+        </div>
+
+        <div class="dashboard-card notification-card">
+          <div class="card-header">
+            <div><span class="card-eyebrow">Updates</span><h3>Recent Notifications</h3></div>
+            <button class="text-btn" data-open-page="notifications" type="button">View all</button>
+          </div>
+          <div class="notification-list" id="dashNotifs"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== MY ROUTES ========== -->
+    <section id="routesSection" class="page-section">
+      <div class="page-heading">
+        <div><span class="section-eyebrow">Transport</span><h2>My Routes</h2><p>Routes subscribed to your student account.</p></div>
+        <div class="page-search"><svg class="ic"><use href="#i-search"/></svg>
+          <input type="search" id="routesFilter" placeholder="Filter routes or stops" aria-label="Filter routes"></div>
+      </div>
+      <div class="route-page-grid" id="routesGrid"></div>
+    </section>
+
+    <!-- ========== LIVE TRACKING ========== -->
+    <section id="trackingSection" class="page-section">
+      <div class="page-heading">
+        <div><span class="section-eyebrow">Real-time GPS</span><h2>Live Tracking</h2><p>View the current location of your university bus.</p></div>
+        <span class="status-badge info" id="trkBadge">Waiting</span>
+      </div>
+      <div class="tracking-layout">
+        <div class="dashboard-card tracking-map-card"><div id="trackingMap" class="large-map"></div></div>
+        <div class="dashboard-card tracking-info">
+          <span class="card-eyebrow">Active bus</span>
+          <div class="tracking-bus-image"> <img id="trackingBusPhoto" src="../photo/bus.jpg" alt="University bus"></div>
+          <h3 id="trkBus">—</h3>
+          <span class="route-code-big" id="trkRoute">—</span>
+          <div class="tracking-stat"><span>Current stop</span><strong id="trkCurrent">—</strong></div>
+          <div class="tracking-stat"><span>Next stop</span><strong id="trkNext">—</strong></div>
+          <div class="tracking-stat"><span>Estimated arrival</span><strong class="blue-text" id="trkEta">—</strong></div>
+          <div class="live-message" id="trkMessage">Waiting for location</div>
+        </div>
+      </div>
+      <div class="dashboard-card journey-card">
+        <h3>Route & Live Journey</h3>
+        <div id="trackingJourneyTimeline"></div>
+      </div>
+    </section>
+
+    <!-- ========== BUS DETAILS ========== -->
+    <section id="busSection" class="page-section">
+      <div class="page-heading">
+        <div><span class="section-eyebrow">Bus information</span><h2>Bus Details</h2><p>Information about your assigned university bus.</p></div>
+      </div>
+      <div class="bus-details-grid">
+        <div class="dashboard-card bus-detail-main">
+          <div class="detail-bus-image"> <img id="detailsBusPhoto" src="../photo/bus.jpg" alt="University bus"></div>
+           <div class="bus-detail-body">
+            <span class="small-label" id="busType">—</span>
+            <h2 id="busNumber">—</h2>
+            <span class="route-code-big" id="busRegistration">—</span>
+            <div class="bus-detail-status" id="busStatusBadge">—</div>
+          </div>
+        </div>
+        <div class="dashboard-card information-card">
+          <h3>Bus Information</h3>
+          <div id="busInfoRows"></div>
+        </div>
+      </div>
+      <div class="dashboard-card journey-card">
+        <h3>Route & Journey Timeline</h3>
+        <div id="busJourneyTimeline"></div>
+      </div>
+    </section>
+
+    <!-- ========== TIMETABLE ========== -->
+    <section id="timetableSection" class="page-section">
+      <div class="page-heading">
+        <div><span class="section-eyebrow">Schedule</span><h2>Timetable</h2><p>Today's university transport schedule.</p></div>
+      </div>
+      <div class="dashboard-card timetable-full">
+        <div class="table-header"><strong>University Bus Schedule</strong><span id="timetableCount">0 schedules</span></div>
+        <div id="timetableBody"></div>
+      </div>
+    </section>
+
+    <!-- ========== NOTIFICATIONS ========== -->
+    <section id="notificationsSection" class="page-section">
+      <div class="page-heading">
+        <div><span class="section-eyebrow">Updates</span><h2>Notifications</h2><p>Important transport updates and alerts.</p></div>
+        <span class="notification-number" id="notifPageCount">0 new</span>
+      </div>
+      <div class="notification-page-list" id="notificationsList"></div>
+    </section>
+
+    <!-- ========== PROFILE ========== -->
+    <section id="profileSection" class="page-section">
+      <div class="page-heading">
+        <div><span class="section-eyebrow">Account</span><h2>My Profile</h2><p>View your university transport account.</p></div>
+      </div>
+      <div class="profile-page-grid">
+        <div class="dashboard-card profile-card">
+          <div class="big-profile-avatar" id="profileAvatar">S</div>
+          <h2 id="profileName">Student</h2>
+          <span id="profileRole">Student</span>
+          <div class="profile-status">Active account</div>
+        </div>
+        <div class="dashboard-card information-card">
+          <h3>Account Information</h3>
+          <div id="profileInfoRows"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== SETTINGS ========== -->
+    <section id="settingsSection" class="page-section">
+      <div class="page-heading">
+        <div><span class="section-eyebrow">Preferences</span><h2>Settings</h2><p>Manage your notification preferences. Saved on this device.</p></div>
+      </div>
+      <div class="dashboard-card settings-card">
+        <div class="setting-row">
+          <div><strong>Bus Arrival Notifications</strong><span>Receive alerts when your bus is approaching.</span></div>
+          <label class="switch"><input type="checkbox" data-setting="busArrival" aria-label="Bus Arrival Notifications"><span class="slider"></span></label>
+        </div>
+        <div class="setting-row">
+          <div><strong>Route Updates</strong><span>Get notifications about route changes.</span></div>
+          <label class="switch"><input type="checkbox" data-setting="routeUpdates" aria-label="Route Updates"><span class="slider"></span></label>
+        </div>
+        <div class="setting-row">
+          <div><strong>Timetable Reminders</strong><span>Receive reminders for upcoming trips.</span></div>
+          <label class="switch"><input type="checkbox" data-setting="timetableReminders" aria-label="Timetable Reminders"><span class="slider"></span></label>
+        </div>
+      </div>
+    </section>
+
+  </section>
+
+  <footer class="dashboard-footer">
+    <span>© 2026 Chanakya University</span>
+    <span>Real-Time University Transport System</span>
+  </footer>
+</main>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="../JavaScript/api-config.js"></script>
+<script src="../JavaScript/common-dashboard.js"></script>
+</body>
+</html>

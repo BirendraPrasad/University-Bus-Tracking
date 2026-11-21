@@ -143,3 +143,92 @@ def create_schedule(
         raise
     finally:
         conn.close()
+
+
+@router.put("/{schedule_id}")
+def update_schedule(
+    schedule_id: int,
+    schedule: ScheduleCreate,
+    current_user: dict = Depends(require_admin),
+):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT schedule_id FROM schedules WHERE schedule_id = %s",
+                (schedule_id,),
+            )
+            if not cur.fetchone():
+                raise HTTPException(status_code=404, detail="Schedule not found")
+
+            cur.execute("SELECT bus_id FROM buses WHERE bus_id = %s", (schedule.bus_id,))
+            if not cur.fetchone():
+                raise HTTPException(status_code=404, detail="Bus not found")
+
+            cur.execute(
+                "SELECT route_id FROM routes WHERE route_id = %s AND is_active = TRUE",
+                (schedule.route_id,),
+            )
+            if not cur.fetchone():
+                raise HTTPException(status_code=404, detail="Active route not found")
+
+            cur.execute("""
+                SELECT schedule_id FROM schedules
+                WHERE bus_id = %s AND route_id = %s
+                  AND day_of_week = %s AND direction = %s
+                  AND departure_time = %s AND schedule_id != %s
+                LIMIT 1
+            """, (
+                schedule.bus_id, schedule.route_id, schedule.day_of_week,
+                schedule.direction, schedule.departure_time, schedule_id,
+            ))
+            if cur.fetchone():
+                raise HTTPException(status_code=409, detail="This schedule already exists")
+
+            cur.execute("""
+                UPDATE schedules
+                SET bus_id = %s, route_id = %s, departure_time = %s,
+                    arrival_time = %s, day_of_week = %s, direction = %s
+                WHERE schedule_id = %s
+            """, (
+                schedule.bus_id, schedule.route_id, schedule.departure_time,
+                schedule.arrival_time, schedule.day_of_week,
+                schedule.direction, schedule_id,
+            ))
+            conn.commit()
+            return {"message": "Schedule updated successfully"}
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+@router.delete("/{schedule_id}")
+def delete_schedule(
+    schedule_id: int,
+    current_user: dict = Depends(require_admin),
+):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM schedules WHERE schedule_id = %s RETURNING schedule_id",
+                (schedule_id,),
+            )
+            if not cur.fetchone():
+                raise HTTPException(status_code=404, detail="Schedule not found")
+
+            conn.commit()
+            return {"message": "Schedule deleted successfully"}
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()

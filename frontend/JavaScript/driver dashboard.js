@@ -9,6 +9,8 @@ const LOGIN_PAGE = "login.html";
 // Must match the key(s) your login page writes the JWT to.
 const TOKEN_KEYS = ["token", "access_token", "accessToken", "jwt"];
 const GPS_SEND_INTERVAL_MS = 5000;
+const GPS_RESUME_KEY = "driver_gps_sharing_requested";
+function gpsResumeStorageKey() { return `${GPS_RESUME_KEY}:${state.profile?.driver_id ?? "unknown"}`; }
 
 const ENDPOINTS = {
   profile: "/drivers/me",
@@ -18,7 +20,8 @@ const ENDPOINTS = {
   notifications: "/drivers/me/notifications",
   start: (id) => `/drivers/me/trips/${encodeURIComponent(id)}/start`,
   end: (id) => `/drivers/me/trips/${encodeURIComponent(id)}/end`,
-  location: (id) => `/drivers/me/trips/${encodeURIComponent(id)}/location`
+  location: (id) => `/drivers/me/trips/${encodeURIComponent(id)}/location`,
+  geofence: "/drivers/me/location"
 };
 
 const state = {
@@ -93,7 +96,6 @@ async function api(path, options = {}) {
     let detail = ""; try { const j = await res.json(); if (typeof j.detail === "string") detail = j.detail; } catch (e) { /* ignore */ }
     throw new ApiError(res.status, friendly(res.status, detail), detail);
   }
-  return res.json();
 }
 function logout() { stopGps(true); clearToken(); redirectLogin(); }
 function showBanner(text, isError) { const b = $("pageBanner"); b.textContent = text; b.className = `banner${isError ? " error" : ""}`; b.hidden = !text; }
@@ -251,9 +253,61 @@ function renderDashboard() {
   $("dashBus").innerHTML = bus ? row("Bus number", bus.bus_number) + row("Bus type", busType(bus.bus_type)) + row("Registration number", bus.registration_number) +
     row("Capacity", bus.capacity ? `${bus.capacity} seats` : null) + row("Assignment", t ? `Trip #${t.trip_id} · ${statusLabel(t.status)}` : "No trip selected") : emptyMsg("No bus is assigned to you yet.");
 }
+function renderDriverJourneyTimeline(t, targetId) {
+  const box = $(targetId);
+  if (!box) return;
+
+  if (!t) {
+    box.innerHTML = emptyMsg("Select a trip to view its journey timeline.");
+    return;
+  }
+
+  const stops = Array.isArray(t.stops)
+    ? [...t.stops].sort((a, b) => Number(a.stop_order || 0) - Number(b.stop_order || 0))
+    : [];
+
+  if (!stops.length) {
+    box.innerHTML = emptyMsg("Journey stop timings are not available for this trip.");
+    return;
+  }
+
+  const showTime = (value) => {
+    if (!value) return "Not available";
+    const time = String(value);
+    return time.length >= 5 ? time.slice(0, 5) : time;
+  };
+
+  box.innerHTML = `<div class="driver-journey-list">
+    ${stops.map((stop, index) => {
+      const pickup = stop.pickup_time
+        ? `<div class="driver-journey-time"><span>Pickup</span><strong>${esc(showTime(stop.pickup_time))}</strong></div>`
+        : "";
+      const drop = stop.drop_time
+        ? `<div class="driver-journey-time"><span>Drop</span><strong>${esc(showTime(stop.drop_time))}</strong></div>`
+        : "";
+      const timing = pickup || drop
+        ? pickup + drop
+        : `<div class="driver-journey-time"><span>Schedule</span><strong>Not available</strong></div>`;
+
+      return `<div class="driver-journey-stop">
+        <div class="driver-journey-marker-column">
+          <span class="driver-journey-marker"></span>
+          ${index < stops.length - 1 ? '<span class="driver-journey-line"></span>' : ""}
+        </div>
+        <div class="driver-journey-content">
+          <strong>${esc(stop.stop_name || "Unnamed stop")}</strong>
+          <span class="driver-journey-status">Scheduled stop · Order ${esc(String(stop.stop_order ?? index + 1))}</span>
+          <div class="driver-journey-times">${timing}</div>
+        </div>
+      </div>`;
+    }).join("")}
+  </div>`;
+}
+
 function renderBus() {
   const bus = tripBus(), t = currentTrip();
   renderBusPhotos(bus);
+  renderDriverJourneyTimeline(t, "driverBusJourneyTimeline");
 
   $("busDetails").innerHTML = bus ? row("Bus number", bus.bus_number) + row("Bus type", busType(bus.bus_type)) + row("Registration number", bus.registration_number) +
     row("Capacity", bus.capacity ? `${bus.capacity} seats` : null) + row("Driver", state.profile.name) +
@@ -262,6 +316,7 @@ function renderBus() {
 function stopsMissingText(t) { return t ? "Stops for this trip are not available. If you selected a trip other than the server's current one, the backend needs the optional trip_id support on GET /drivers/me/trip." : "Select a trip to see its route."; }
 function renderRoute() {
   const t = currentTrip();
+  renderDriverJourneyTimeline(t, "driverRouteJourneyTimeline");
   $("routeInfo").innerHTML = t ? row("Route code", t.route.route_code) + row("Route name", t.route.route_name) + row("Start point", t.route.start_point) + row("End point", t.route.end_point)
     : emptyMsg(state.serverTripError && state.selectedId === null ? state.serverTripError.message : "No trip selected.");
   $("stopsList").innerHTML = t && t.stops && t.stops.length ? t.stops.map((s) => {
@@ -305,16 +360,55 @@ function renderGps() {
   $("gpsBadge").className = `badge ${cls}`; setText("gpsBadge", label);
   setText("gpsLat", g.lat !== null ? g.lat.toFixed(6) : "—"); setText("gpsLng", g.lng !== null ? g.lng.toFixed(6) : "—"); setText("gpsUpdated", g.time ? fmtDT(g.time) : "—");
   const running = g.status === "active" || g.status === "requesting";
-  $("startGpsBtn").disabled = running || !(t && t.status === "ACTIVE"); $("stopGpsBtn").disabled = !running;
+  $("startGpsBtn").disabled = running || !state.profile?.bus; $("stopGpsBtn").disabled = !running;
   renderDashboard();
 }
 function renderHistory() {
   const body = $("historyBody"), empty = $("historyEmpty"), h = state.history;
-  if (state.loadingTrips && !h) { body.innerHTML = ""; empty.hidden = false; empty.textContent = "Loading trip history…"; return; }
-  if (!h) { body.innerHTML = ""; empty.hidden = false; empty.textContent = state.historyError && state.historyError.status === 404 ? "Trip history API not available yet." : (state.historyError ? state.historyError.message : "No trip history."); return; }
-  empty.hidden = h.length > 0; empty.textContent = "No trips recorded yet.";
-  body.innerHTML = h.map((t) => `<tr><td>#${esc(t.trip_id)}</td><td>${esc(dash(t.trip_date))}</td><td>${esc(dash(t.bus.bus_number))}</td><td>${esc(dash(t.route.route_code))}</td>
-    <td>${esc(fmtTime(t.start_time))}</td><td>${esc(fmtTime(t.end_time))}</td><td>${statusBadge(t.status)}</td></tr>`).join("");
+  if (state.loadingTrips && !h) {
+    body.innerHTML = "";
+    empty.hidden = false;
+    empty.textContent = "Loading trip history…";
+    return;
+  }
+  if (!h) {
+    body.innerHTML = "";
+    empty.hidden = false;
+    empty.textContent = state.historyError ? state.historyError.message : "No trip history.";
+    return;
+  }
+  if (!h.length) {
+    body.innerHTML = "";
+    empty.hidden = false;
+    empty.textContent = "No trips recorded yet.";
+    return;
+  }
+
+  empty.hidden = true;
+  const grouped = {};
+  h.forEach(t => {
+    const date = t.trip_date || "Unknown date";
+    if (!grouped[date]) grouped[date] = [];
+    grouped[date].push(t);
+  });
+
+  body.innerHTML = Object.entries(grouped).map(([date, trips]) => {
+    const completed = trips.filter(t => String(t.status).toUpperCase() === "COMPLETED").length;
+    const active = trips.filter(t => String(t.status).toUpperCase() === "ACTIVE").length;
+    const rows = trips.map(t => `<tr>
+      <td>#${esc(t.trip_id)}</td>
+      <td>${esc(dash(t.trip_date))}</td>
+      <td>${esc(dash(t.bus.bus_number))}</td>
+      <td>${esc(dash(t.route.route_code))}</td>
+      <td>${esc(fmtTime(t.start_time))}</td>
+      <td>${esc(fmtTime(t.end_time))}</td>
+      <td>${statusBadge(t.status)}</td>
+    </tr>`).join("");
+
+    return `<tr><td colspan="7" style="font-weight:700;background:var(--surface-2,#eef2f7);padding:12px">
+      ${esc(date)} — Total: ${trips.length} | Completed: ${completed} | Active: ${active}
+    </td></tr>${rows}`;
+  }).join("");
 }
 function renderNotifications() {
   const n = state.notifs;
@@ -407,24 +501,28 @@ async function tripAction(kind) {
 
 /* ---------- GPS (browser Geolocation API -> FastAPI -> Kafka -> PostgreSQL) ---------- */
 function startGps() {
-  const t = currentTrip();
-  if (!t || t.status !== "ACTIVE") { setMsg("gpsNote", "Start your trip first. GPS sharing is only available during an active trip.", "error"); return; }
+  if (!state.profile?.bus) { setMsg("gpsNote", "No bus is assigned to your driver account.", "error"); return; }
   if (!("geolocation" in navigator)) { state.gps.status = "error"; setMsg("gpsNote", "This device or browser does not support GPS.", "error"); renderGps(); return; }
   if (state.gps.watchId !== null) return;
-  if (!window.isSecureContext) setMsg("gpsNote", "Phones only allow GPS on HTTPS pages (or localhost). Open the dashboard over HTTPS.", "error");
-  else setMsg("gpsNote", "Waiting for location permission…", "");
-  state.gps.status = "requesting"; state.gps.tripId = t.trip_id; renderGps();
+  if (!window.isSecureContext) { setMsg("gpsNote", "GPS requires HTTPS. Open the driver dashboard using a secure HTTPS connection.", "error"); return; }
+  localStorage.setItem(gpsResumeStorageKey(), "true");
+  setMsg("gpsNote", "Waiting for location permission…", "");
+  state.gps.status = "requesting"; state.gps.tripId = null; renderGps();
   state.gps.watchId = navigator.geolocation.watchPosition(onGpsSuccess, onGpsError, { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 });
 }
-function stopGps(silent) {
+function stopGps(silent, preservePreference = false) {
   if (state.gps.watchId !== null && "geolocation" in navigator) navigator.geolocation.clearWatch(state.gps.watchId);
   state.gps.watchId = null; state.gps.tripId = null; state.gps.status = "not_started";
+  if (!preservePreference) localStorage.removeItem(gpsResumeStorageKey());
   if (!silent) { setMsg("gpsNote", "GPS sharing stopped.", ""); renderGps(); }
 }
 function onGpsSuccess(pos) {
   const g = state.gps; g.status = "active"; g.lat = pos.coords.latitude; g.lng = pos.coords.longitude; g.time = new Date(pos.timestamp).toISOString();
   updateDeviceMarkers(); renderGps();
-  if (Date.now() - g.lastSent >= GPS_SEND_INTERVAL_MS) { g.lastSent = Date.now(); sendLocation(pos.coords); }
+  if (Date.now() - g.lastSent >= GPS_SEND_INTERVAL_MS) {
+    g.lastSent = Date.now();
+    sendLocation(pos.coords, pos.timestamp);
+  }
 }
 function onGpsError(err) {
   state.gps.status = err.code === 1 ? "denied" : "error";
@@ -432,18 +530,37 @@ function onGpsError(err) {
   if (state.gps.watchId !== null) { navigator.geolocation.clearWatch(state.gps.watchId); state.gps.watchId = null; }
   renderGps();
 }
-async function sendLocation(c) {
-  const g = state.gps, t = currentTrip();
-  if (g.sending || g.tripId === null || !t || t.status !== "ACTIVE" || !sameId(t.trip_id, g.tripId)) return; // never send for scheduled/completed/other trips
+async function sendLocation(c, timestamp) {
+  const g = state.gps;
+  if (g.sending) return;
   g.sending = true;
-  const speed = typeof c.speed === "number" && c.speed >= 0 ? c.speed : null; // m/s, null when unknown
+  const speed = typeof c.speed === "number" && c.speed >= 0 ? c.speed : null;
   try {
-    await api(ENDPOINTS.location(g.tripId), { method: "POST", body: JSON.stringify({ latitude: c.latitude, longitude: c.longitude, speed }) });
-    setMsg("gpsNote", `Location sent to server at ${new Date().toLocaleTimeString()}.`, "ok");
+    const result = await api(ENDPOINTS.geofence, {
+      method: "POST",
+      body: JSON.stringify({
+        latitude: c.latitude,
+        longitude: c.longitude,
+        speed,
+        recorded_at: new Date(timestamp).toISOString()
+      })
+    });
+    const action = result.trip_action;
+    setMsg("gpsNote",
+      action === "TRIP_STARTED" ? `Automatic trip ${result.trip_id} started. GPS is being shared.` :
+      action === "TRIP_COMPLETED" ? `Trip ${result.trip_id} completed automatically.` :
+      result.inside_campus ? "GPS active: bus is inside campus geofence." : "GPS active: monitoring bus outside campus.",
+      "ok"
+    );
+    if (action === "TRIP_STARTED" || action === "TRIP_COMPLETED") {
+      await loadTripData();
+      renderAll();
+    }
   } catch (e) {
-    if (e.status === 409) { stopGps(false); setMsg("gpsNote", e.message, "error"); await loadTripData(); renderAll(); }
-    else setMsg("gpsNote", e.status === 404 && e.detail === "Not Found" ? "GPS API integration pending." : e.message, "error");
-  } finally { g.sending = false; }
+    setMsg("gpsNote", e.message || "Could not send GPS location.", "error");
+  } finally {
+    g.sending = false;
+  }
 }
 
 /* ---------- navigation + events (bound once) ---------- */
@@ -477,7 +594,7 @@ function bindEvents() {
   $("endTripBtn").addEventListener("click", () => { if (confirm("End this trip? GPS sharing will stop.")) tripAction("end"); });
   $("startGpsBtn").addEventListener("click", startGps); $("stopGpsBtn").addEventListener("click", () => stopGps(false));
   window.addEventListener("resize", () => { if (window.innerWidth > 900) closeDrawer(); Object.values(state.maps).forEach((m) => m.map.invalidateSize()); });
-  window.addEventListener("pagehide", () => stopGps(true));
+  window.addEventListener("pagehide", () => stopGps(true, true));
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDrawer(); });
   document.addEventListener("error", (e) => { // missing bus photo -> show text fallback instead of a broken image
     const img = e.target;
@@ -498,6 +615,12 @@ async function init() {
   renderHeader(); renderProfile(); renderTrips(); renderTrip(); renderDashboard(); renderMaps();
   await initialLoad();
   renderAll();
+
+  // Resume GPS for every driver who previously enabled sharing.
+  // Active trip is not required; geofence will start trips automatically.
+  if (localStorage.getItem(gpsResumeStorageKey()) === "true" && state.profile?.bus) {
+    startGps();
+  }
 }
 document.addEventListener("DOMContentLoaded", init);
 

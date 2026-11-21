@@ -84,6 +84,32 @@ def login(user: UserLogin):
                             detail="Driver registration request not found"
                         )
 
+            # Driver Route ID Verification
+            if db_user[4] == "DRIVER":
+
+                if user.route_id is None:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Route ID is required for driver login"
+                    )
+
+                cursor.execute("""
+                    SELECT b.route_id
+                    FROM drivers d
+                    JOIN buses b ON b.driver_id = d.driver_id
+                    WHERE d.user_id = %s
+                      AND b.route_id = %s
+                    LIMIT 1
+                """, (db_user[0], user.route_id))
+
+                assigned_route = cursor.fetchone()
+
+                if not assigned_route:
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Invalid Route ID or route is not assigned to this driver"
+                    )
+
             if not db_user[5]:
                 raise HTTPException(
                     status_code=403,
