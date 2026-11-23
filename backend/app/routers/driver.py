@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 from backend.app.dependencies import get_current_user, require_admin
 from backend.app.database.connection import get_connection
+from backend.app.services.notifications import create_notification_if_enabled
 
 from kafka import KafkaProducer
 import json
@@ -368,29 +369,10 @@ def start_trip(trip_id: int, current_user: dict = Depends(require_driver)):
 
 @router.post("/me/trips/{trip_id}/end")
 def end_trip(trip_id: int, current_user: dict = Depends(require_driver)):
-    conn = get_connection()
-    try:
-        with conn.cursor() as cur:
-            driver_id = _driver_id(cur, current_user["user_id"])
-            cur.execute("SELECT status FROM trips WHERE trip_id = %s AND driver_id = %s FOR UPDATE",
-                        (trip_id, driver_id))
-            row = cur.fetchone()
-            if not row:
-                raise HTTPException(status_code=404, detail="Trip not found")
-            if row[0] != "ACTIVE":
-                raise HTTPException(status_code=409, detail=f"Only an active trip can be ended (current status: {row[0]})")
-            cur.execute("""
-                UPDATE trips SET status = 'COMPLETED', end_time = CURRENT_TIMESTAMP
-                WHERE trip_id = %s RETURNING trip_id, status, end_time
-            """, (trip_id,))
-            r = cur.fetchone()
-            conn.commit()
-            return {"trip_id": r[0], "status": r[1], "end_time": _iso(r[2])}
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+    raise HTTPException(
+        status_code=409,
+        detail="Trips are completed automatically when the bus enters the campus geofence."
+    )
 
 
 # Driver GPS point -> bus_locations (only while the driver's trip is ACTIVE)
@@ -562,9 +544,37 @@ def _distance_meters(lat1, lon1, lat2, lon2):
 
 
 def _process_geofence_location(bus_id: int, loc: LocationIn, source: str, expected_driver_id=None):
-    """Shared geofence processor for real GPS and admin simulation."""
+    """Process GPS with persistent timestamp and geofence transition validation."""
     if source not in ("REAL", "SIMULATED"):
         raise HTTPException(status_code=400, detail="Invalid GPS source")
+
+    GPS_STALE_SECONDS = 60
+    GPS_FUTURE_TOLERANCE_SECONDS = 10
+    GPS_MAX_SAMPLE_GAP_SECONDS = 10
+    REQUIRED_GPS_READINGS = 5
+    REQUIRED_DWELL_SECONDS = 20
+
+    received_at = datetime.now(timezone.utc)
+    recorded_at = loc.recorded_at or received_at
+
+    if recorded_at.tzinfo is None:
+        recorded_at = recorded_at.replace(tzinfo=timezone.utc)
+    else:
+        recorded_at = recorded_at.astimezone(timezone.utc)
+
+    age_seconds = (received_at - recorded_at).total_seconds()
+
+    if age_seconds > GPS_STALE_SECONDS:
+        raise HTTPException(
+            status_code=422,
+            detail="GPS reading is stale. Please send a fresh location."
+        )
+
+    if age_seconds < -GPS_FUTURE_TOLERANCE_SECONDS:
+        raise HTTPException(
+            status_code=422,
+            detail="GPS timestamp is too far in the future."
+        )
 
     state_table = (
         "bus_geofence_state"
@@ -609,6 +619,7 @@ def _process_geofence_location(bus_id: int, loc: LocationIn, source: str, expect
                 loc.latitude, loc.longitude, CAMPUS_LAT, CAMPUS_LNG
             ) <= GEOFENCE_RADIUS_METERS
 
+            # Lock the stable geofence state.
             cur.execute(f"""
                 SELECT is_inside
                 FROM {state_table}
@@ -617,31 +628,143 @@ def _process_geofence_location(bus_id: int, loc: LocationIn, source: str, expect
             """, (bus_id,))
             previous = cur.fetchone()
 
-            if previous is None:
+            initialized = previous is None
+
+            if initialized:
+                # First reading is only a baseline, never a trip transition.
+                was_inside = inside
                 cur.execute(f"""
                     INSERT INTO {state_table}
-                    (bus_id, is_inside, last_latitude, last_longitude)
-                    VALUES (%s, %s, %s, %s)
+                    (bus_id, is_inside, last_latitude, last_longitude, updated_at)
+                    VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP)
                 """, (bus_id, inside, loc.latitude, loc.longitude))
-
-                if inside:
-                    conn.commit()
-                    return {
-                        "message": "GPS initialized inside campus",
-                        "bus_number": bus_number,
-                        "inside_campus": True,
-                        "trip_action": "NONE",
-                        "trip_id": None,
-                        "source": source
-                    }
-
-                # First reading outside campus is treated as departure.
-                was_inside = True
             else:
                 was_inside = previous[0]
 
+            # Create and lock persistent validation state separately per source.
+            cur.execute("""
+                INSERT INTO bus_geofence_validation_state
+                    (bus_id, source, candidate_count, last_recorded_at)
+                VALUES (%s, %s, 0, NULL)
+                ON CONFLICT (bus_id, source) DO NOTHING
+            """, (bus_id, source))
+
+            cur.execute("""
+                SELECT candidate_inside, candidate_started_at,
+                       candidate_last_at, candidate_count, last_recorded_at
+                FROM bus_geofence_validation_state
+                WHERE bus_id = %s AND source = %s
+                FOR UPDATE
+            """, (bus_id, source))
+            validation = cur.fetchone()
+
+            candidate_inside, candidate_started_at, candidate_last_at, candidate_count, last_recorded_at = validation
+
+            if last_recorded_at is not None:
+                if recorded_at <= last_recorded_at:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Duplicate or out-of-order GPS timestamp rejected."
+                    )
+
             action = "NONE"
             trip_id = None
+            transition_confirmed = False
+
+            if initialized:
+                # Baseline only. Do not infer a departure from the first reading.
+                cur.execute("""
+                    UPDATE bus_geofence_validation_state
+                    SET candidate_inside = NULL,
+                        candidate_started_at = NULL,
+                        candidate_last_at = NULL,
+                        candidate_count = 0,
+                        last_recorded_at = %s,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE bus_id = %s AND source = %s
+                """, (recorded_at, bus_id, source))
+
+            elif inside == was_inside:
+                # The bus returned to its stable side; discard the candidate.
+                cur.execute("""
+                    UPDATE bus_geofence_validation_state
+                    SET candidate_inside = NULL,
+                        candidate_started_at = NULL,
+                        candidate_last_at = NULL,
+                        candidate_count = 0,
+                        last_recorded_at = %s,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE bus_id = %s AND source = %s
+                """, (recorded_at, bus_id, source))
+
+            else:
+                gap_seconds = (
+                    (recorded_at - candidate_last_at).total_seconds()
+                    if candidate_last_at is not None else None
+                )
+
+                if (
+                    candidate_inside != inside
+                    or candidate_started_at is None
+                    or gap_seconds is None
+                    or gap_seconds > GPS_MAX_SAMPLE_GAP_SECONDS
+                ):
+                    candidate_count = 1
+                    candidate_started_at = recorded_at
+                    candidate_last_at = recorded_at
+                else:
+                    candidate_count += 1
+                    candidate_last_at = recorded_at
+
+                dwell_seconds = (
+                    (recorded_at - candidate_started_at).total_seconds()
+                )
+
+                transition_confirmed = (
+                    candidate_count >= REQUIRED_GPS_READINGS
+                    and dwell_seconds >= REQUIRED_DWELL_SECONDS
+                )
+
+                if transition_confirmed:
+                    cur.execute(f"""
+                        UPDATE {state_table}
+                        SET is_inside = %s
+                        WHERE bus_id = %s
+                    """, (inside, bus_id))
+                    cur.execute("""
+                        UPDATE bus_geofence_validation_state
+                        SET candidate_inside = NULL,
+                            candidate_started_at = NULL,
+                            candidate_last_at = NULL,
+                            candidate_count = 0,
+                            last_recorded_at = %s,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE bus_id = %s AND source = %s
+                    """, (recorded_at, bus_id, source))
+                else:
+                    cur.execute("""
+                        UPDATE bus_geofence_validation_state
+                        SET candidate_inside = %s,
+                            candidate_started_at = %s,
+                            candidate_last_at = %s,
+                            candidate_count = %s,
+                            last_recorded_at = %s,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE bus_id = %s AND source = %s
+                    """, (
+                        inside, candidate_started_at, candidate_last_at,
+                        candidate_count, recorded_at, bus_id, source
+                    ))
+
+            # Update GPS heartbeat for every accepted reading.
+            # Keep stable is_inside unchanged until transition confirmation.
+            cur.execute(f"""
+                UPDATE {state_table}
+                SET last_latitude = %s,
+                    last_longitude = %s,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE bus_id = %s
+            """, (loc.latitude, loc.longitude, bus_id))
 
             cur.execute("""
                 SELECT trip_id, route_id, source
@@ -652,7 +775,6 @@ def _process_geofence_location(bus_id: int, loc: LocationIn, source: str, expect
             """, (bus_id,))
             active_trips = cur.fetchall()
 
-            # Never let simulation alter a real trip, or vice versa.
             other_source_trip = next(
                 (row for row in active_trips if row[2] != source), None
             )
@@ -666,24 +788,49 @@ def _process_geofence_location(bus_id: int, loc: LocationIn, source: str, expect
                 (row for row in active_trips if row[2] == source), None
             )
 
-            if was_inside and not inside:
-                if active_trip:
-                    raise HTTPException(
-                        status_code=409,
-                        detail="An active trip already exists for this bus."
-                    )
-
+            # Start or reconcile a trip whenever valid GPS confirms bus is outside.
+            if not inside and not active_trip:
                 cur.execute("""
-                    INSERT INTO trips
-                    (bus_id, route_id, driver_id, trip_date, start_time, status, source)
-                    VALUES (%s, %s, %s, CURRENT_DATE, CURRENT_TIMESTAMP, 'ACTIVE', %s)
-                    RETURNING trip_id
-                """, (bus_id, route_id, driver_id, source))
+                    SELECT trip_id
+                    FROM trips
+                    WHERE bus_id = %s
+                      AND driver_id = %s
+                      AND route_id = %s
+                      AND source = %s
+                      AND status = 'SCHEDULED'
+                      AND trip_date <= CURRENT_DATE
+                    ORDER BY trip_date ASC, trip_id ASC
+                    LIMIT 1
+                    FOR UPDATE
+                """, (bus_id, driver_id, route_id, source))
+                scheduled_trip = cur.fetchone()
 
-                trip_id = cur.fetchone()[0]
-                action = "TRIP_STARTED"
+                if scheduled_trip:
+                    trip_id = scheduled_trip[0]
+                    cur.execute("""
+                        UPDATE trips
+                        SET status = 'ACTIVE',
+                            start_time = CURRENT_TIMESTAMP,
+                            end_time = NULL
+                        WHERE trip_id = %s AND status = 'SCHEDULED'
+                        RETURNING trip_id
+                    """, (trip_id,))
+                    started = cur.fetchone()
+                    if started:
+                        trip_id = started[0]
+                        action = "TRIP_STARTED"
+                else:
+                    cur.execute("""
+                        INSERT INTO trips
+                        (bus_id, route_id, driver_id, trip_date, start_time, status, source)
+                        VALUES (%s, %s, %s, CURRENT_DATE, CURRENT_TIMESTAMP, 'ACTIVE', %s)
+                        RETURNING trip_id
+                    """, (bus_id, route_id, driver_id, source))
+                    trip_id = cur.fetchone()[0]
+                    action = "TRIP_STARTED"
 
-            elif not was_inside and inside and active_trip:
+            # A confirmed campus ENTRY completes the active trip.
+            elif transition_confirmed and not was_inside and inside and active_trip:
                 active_trip_id, active_trip_route_id, _ = active_trip
 
                 if active_trip_route_id != route_id:
@@ -705,14 +852,47 @@ def _process_geofence_location(bus_id: int, loc: LocationIn, source: str, expect
                     trip_id = completed[0]
                     action = "TRIP_COMPLETED"
 
-            cur.execute(f"""
-                UPDATE {state_table}
-                SET is_inside = %s,
-                    last_latitude = %s,
-                    last_longitude = %s,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE bus_id = %s
-            """, (inside, loc.latitude, loc.longitude, bus_id))
+            if source == "REAL" and action in ("TRIP_STARTED", "TRIP_COMPLETED"):
+                event_title = (
+                    "Bus Trip Started"
+                    if action == "TRIP_STARTED"
+                    else "Bus Trip Completed"
+                )
+                event_message = (
+                    f"Bus {bus_number}: trip #{trip_id} has started."
+                    if action == "TRIP_STARTED"
+                    else f"Bus {bus_number}: trip #{trip_id} has been completed."
+                )
+
+                cur.execute(
+                    "SELECT user_id FROM drivers WHERE driver_id = %s",
+                    (driver_id,)
+                )
+                driver_user = cur.fetchone()
+                recipient_ids = set()
+
+                if driver_user:
+                    recipient_ids.add(driver_user[0])
+
+                cur.execute("""
+                    SELECT DISTINCT s.user_id
+                    FROM subscriptions sub
+                    JOIN students s ON s.student_id = sub.student_id
+                    WHERE sub.route_id = %s
+                      AND sub.is_active = TRUE
+                """, (route_id,))
+
+                recipient_ids.update(row[0] for row in cur.fetchall())
+
+                for recipient_id in recipient_ids:
+                    create_notification_if_enabled(
+                        cur,
+                        recipient_id,
+                        event_title,
+                        event_message,
+                        preference_key="tripAlerts",
+                        notification_type=action
+                    )
 
             if not inside:
                 cur.execute("""
@@ -737,11 +917,7 @@ def _process_geofence_location(bus_id: int, loc: LocationIn, source: str, expect
                     "latitude": loc.latitude,
                     "longitude": loc.longitude,
                     "speed": loc.speed,
-                    "recorded_at": (
-                        loc.recorded_at.isoformat()
-                        if loc.recorded_at
-                        else datetime.now(timezone.utc).isoformat()
-                    )
+                    "recorded_at": recorded_at.isoformat()
                 })
                 producer.flush()
 
@@ -751,7 +927,13 @@ def _process_geofence_location(bus_id: int, loc: LocationIn, source: str, expect
                 "inside_campus": inside,
                 "trip_action": action,
                 "trip_id": trip_id,
-                "source": source
+                "source": source,
+                "geofence_confirmed": transition_confirmed,
+                "gps_readings_required": REQUIRED_GPS_READINGS,
+                "gps_candidate_count": (
+                    0 if transition_confirmed or initialized or inside == was_inside
+                    else candidate_count
+                )
             }
 
     except Exception:

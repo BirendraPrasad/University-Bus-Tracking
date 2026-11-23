@@ -68,7 +68,7 @@ const CONFIG = {
       `/students/routes/${encodeURIComponent(routeId)}/bus`,
 
    routeLocation: (routeId) =>
-  `/students/routes/${encodeURIComponent(routeId)}/bus/location`,
+      `/students/me/routes/${encodeURIComponent(routeId)}/bus/location`,
 
     timetable: "/students/me/timetable",
 
@@ -1286,6 +1286,88 @@ function updateBusInfo(
 
 
 
+
+/* ---------- Live bus to next-stop distance ---------- */
+
+function calculateNextStopDistance(latitude, longitude, stops) {
+  if (!Array.isArray(stops) || stops.length < 2) return null;
+
+  const valid = [...stops]
+    .filter(stop =>
+      Number.isFinite(Number(stop.latitude)) &&
+      Number.isFinite(Number(stop.longitude)) &&
+      !(Number(stop.latitude) === 0 && Number(stop.longitude) === 0)
+    )
+    .sort((a, b) => Number(a.stop_order) - Number(b.stop_order));
+
+  if (valid.length < 2) return null;
+
+  const toXY = (lat, lon, refLat) => ({
+    x: lon * 111320 * Math.cos(refLat * Math.PI / 180),
+    y: lat * 110540
+  });
+
+  let best = null;
+
+  for (let i = 0; i < valid.length - 1; i++) {
+    const a = valid[i];
+    const b = valid[i + 1];
+    const refLat = (Number(a.latitude) + Number(b.latitude)) / 2;
+
+    const A = toXY(Number(a.latitude), Number(a.longitude), refLat);
+    const B = toXY(Number(b.latitude), Number(b.longitude), refLat);
+    const P = toXY(latitude, longitude, refLat);
+
+    const dx = B.x - A.x;
+    const dy = B.y - A.y;
+    const lengthSquared = dx * dx + dy * dy;
+
+    if (!lengthSquared) continue;
+
+    const t = Math.max(0, Math.min(1,
+      ((P.x - A.x) * dx + (P.y - A.y) * dy) / lengthSquared
+    ));
+
+    const crossX = A.x + t * dx;
+    const crossY = A.y + t * dy;
+    const offset = Math.hypot(P.x - crossX, P.y - crossY);
+
+    if (!best || offset < best.offset) {
+      best = { index: i, t, offset };
+    }
+  }
+
+  if (!best) return null;
+
+  let nextIndex = best.index + 1;
+
+  // If the bus has reached the segment's endpoint, advance to the following stop.
+  if (best.t >= 0.98 && nextIndex + 1 < valid.length) {
+    nextIndex++;
+  }
+
+  const stop = valid[nextIndex];
+  const earthRadiusKm = 6371;
+  const rad = value => value * Math.PI / 180;
+
+  const dLat = rad(Number(stop.latitude) - latitude);
+  const dLon = rad(Number(stop.longitude) - longitude);
+  const lat1 = rad(latitude);
+  const lat2 = rad(Number(stop.latitude));
+
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+
+  const distanceKm = 2 * earthRadiusKm *
+    Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+
+  return {
+    stop,
+    distanceKm: Number(distanceKm.toFixed(2))
+  };
+}
+
 async function pollLiveLocation() {
   const route = state.activeRoute;
 
@@ -1327,9 +1409,34 @@ async function pollLiveLocation() {
     const isFresh =
       Number.isFinite(ageInSeconds) &&
       ageInSeconds >= 0 &&
-      ageInSeconds <= 30;
+      ageInSeconds <= 60;
 
     setRouteGpsStatus(route, isFresh);
+
+    if (isFresh) {
+      const result = calculateNextStopDistance(
+        location.latitude,
+        location.longitude,
+        route.stopsData
+      );
+
+      if (result) {
+        route.next_stop = result.stop.stop_name;
+        route.next_stop_distance_km = result.distanceKm;
+        updateNextStop(
+          `${result.stop.stop_name} · ${result.distanceKm} km`
+        );
+      } else {
+        route.next_stop = null;
+        route.next_stop_distance_km = null;
+        updateNextStop("Distance unavailable");
+      }
+    } else {
+      route.next_stop = null;
+      route.next_stop_distance_km = null;
+      updateNextStop("GPS stale — distance unavailable");
+    }
+
     renderActiveJourneyTimelines();
 
     const liveDot = $("liveDot");
@@ -3291,44 +3398,37 @@ function loadSettings() {
 }
 
 
-function initSettings() {
+async function initSettings() {
+  let settings = loadSettings();
 
-  const settings =
-    loadSettings();
+  try {
+    const result = await apiFetch("/notifications/preferences");
+    settings = { ...settings, ...(result.preferences || {}) };
+  } catch (error) {
+    console.error("Could not load saved notification preferences:", error);
+  }
 
+  $$("[data-setting]").forEach(input => {
+    const key = input.dataset.setting;
+    input.checked = Boolean(settings[key]);
 
-  $$("[data-setting]")
-    .forEach(
-      (input) => {
-
-        input.checked =
-          !!settings[
-            input.dataset.setting
-          ];
-
-
-        input.addEventListener(
-          "change",
-          () => {
-
-            settings[
-              input.dataset.setting
-            ] =
-              input.checked;
-
-
-            localStorage.setItem(
-              CONFIG.SETTINGS_KEY,
-              JSON.stringify(
-                settings
-              )
-            );
-
-          }
-        );
-
+    input.addEventListener("change", async () => {
+      settings[key] = input.checked;
+      try {
+        const result = await apiFetch("/notifications/preferences", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(settings)
+        });
+        settings = { ...settings, ...(result.preferences || {}) };
+      } catch (error) {
+        input.checked = !input.checked;
+        settings[key] = input.checked;
+        console.error("Could not save notification preferences:", error);
+        alert("Settings could not be saved. Please try again.");
       }
-    );
+    });
+  });
 }
 
 

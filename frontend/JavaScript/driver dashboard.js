@@ -30,7 +30,7 @@ const state = {
   serverTrip: null, serverTripError: null,
   selectedId: null,
   history: null, historyError: null,
-  notifs: null, notifError: null,
+  notifs: null, notifError: null, notificationPreferences: {},
   busy: false,
   gps: { status: "not_started", watchId: null, tripId: null, lastSent: 0, sending: false, lat: null, lng: null, time: null },
   maps: {}
@@ -96,6 +96,7 @@ async function api(path, options = {}) {
     let detail = ""; try { const j = await res.json(); if (typeof j.detail === "string") detail = j.detail; } catch (e) { /* ignore */ }
     throw new ApiError(res.status, friendly(res.status, detail), detail);
   }
+  return res.json();
 }
 function logout() { stopGps(true); clearToken(); redirectLogin(); }
 function showBanner(text, isError) { const b = $("pageBanner"); b.textContent = text; b.className = `banner${isError ? " error" : ""}`; b.hidden = !text; }
@@ -172,8 +173,47 @@ async function fetchHistory() {
   } catch (e) { state.history = null; state.historyError = e; }
 }
 async function fetchNotifs() {
-  try { const d = await api(ENDPOINTS.notifications); state.notifs = Array.isArray(d) ? d : []; state.notifError = null; }
-  catch (e) { state.notifs = null; state.notifError = e; }
+  try {
+    const d = await api("/notifications/");
+    state.notifs = Array.isArray(d.notifications) ? d.notifications : [];
+    state.unreadCount = Number(d.unread_count || 0);
+    state.notifError = null;
+  } catch (e) { state.notifs = null; state.notifError = e; }
+}
+async function loadNotificationPreferences() {
+  try {
+    const d = await api("/notifications/preferences");
+    state.notificationPreferences = d.preferences || {};
+    document.querySelectorAll("#settingsSection [data-setting]").forEach(input => {
+      input.checked = Boolean(state.notificationPreferences[input.dataset.setting]);
+    });
+  } catch (e) { showBanner("Could not load notification preferences: " + e.message, true); }
+}
+async function saveNotificationPreferences() {
+  const preferences = { ...state.notificationPreferences };
+  document.querySelectorAll("#settingsSection [data-setting]").forEach(input => {
+    preferences[input.dataset.setting] = input.checked;
+  });
+  try {
+    const d = await api("/notifications/preferences", {
+      method: "PUT", body: JSON.stringify(preferences)
+    });
+    state.notificationPreferences = d.preferences || preferences;
+    showBanner("Notification preferences saved.", false);
+  } catch (e) {
+    showBanner("Could not save preferences: " + e.message, true);
+    await loadNotificationPreferences();
+  }
+}
+async function markDriverNotificationRead(id) {
+  await api(`/notifications/${encodeURIComponent(id)}/read`, { method: "PATCH" });
+  await fetchNotifs();
+  renderNotifications();
+}
+async function markAllDriverNotificationsRead() {
+  await api("/notifications/read-all", { method: "PATCH" });
+  await fetchNotifs();
+  renderNotifications();
 }
 async function loadTripData() {
   state.loadingTrips = true; renderTrips();
@@ -412,10 +452,16 @@ function renderHistory() {
 }
 function renderNotifications() {
   const n = state.notifs;
-  $("notifDot").hidden = !(n && n.some((x) => !x.is_read));
-  $("notifList").innerHTML = !n ? emptyMsg(state.notifError && state.notifError.status !== 404 ? state.notifError.message : "No notifications available yet.")
-    : n.length ? n.map((x) => `<div class="notif-item ${x.is_read ? "" : "unread"}"><div><strong>${esc(x.title)}</strong><p>${esc(x.message)}</p>
-      <small>${esc(fmtDT(x.created_at))} · ${x.is_read ? "Read" : "Unread"}</small></div></div>`).join("") : emptyMsg("No notifications available yet.");
+  $("notifDot").hidden = !(n && n.some(x => !x.is_read));
+  const markAll = n && n.some(x => !x.is_read)
+    ? '<button class="btn outline" id="driverMarkAllRead" type="button">Mark all as read</button>' : "";
+  $("notifList").innerHTML = !n
+    ? emptyMsg(state.notifError ? state.notifError.message : "No notifications available yet.")
+    : markAll + (n.length ? n.map(x => `<div class="notif-item ${x.is_read ? "" : "unread"}">
+        <div><strong>${esc(x.title)}</strong><p>${esc(x.message)}</p>
+        <small>${esc(fmtDT(x.created_at))} · ${x.is_read ? "Read" : "Unread"}</small>
+        ${x.is_read ? "" : `<button class="btn outline" type="button" data-driver-read="${esc(x.notification_id)}">Mark as read</button>`}
+        </div></div>`).join("") : emptyMsg("No notifications available yet."));
 }
 function renderProfile() {
   const p = state.profile, bus = p.bus;
@@ -534,7 +580,7 @@ async function sendLocation(c, timestamp) {
   const g = state.gps;
   if (g.sending) return;
   g.sending = true;
-  const speed = typeof c.speed === "number" && c.speed >= 0 ? c.speed : null;
+  const speed = typeof c.speed === "number" && c.speed >= 0 ? Number((c.speed * 3.6).toFixed(2)) : null;
   try {
     const result = await api(ENDPOINTS.geofence, {
       method: "POST",
@@ -573,7 +619,10 @@ function showSection(page) {
   $$(".menu-item[data-page]").forEach((m) => m.classList.toggle("active", m.dataset.page === page));
   setText("pageTitle", TITLES[page]); closeDrawer(); window.scrollTo({ top: 0 });
   if (page === "dashboard" || page === "route") { renderMaps(); setTimeout(() => Object.values(state.maps).forEach((m) => m.map.invalidateSize()), 120); }
-  if (page === "settings") showGpsPermission();
+  if (page === "settings") {
+    showGpsPermission();
+    loadNotificationPreferences();
+  }
 }
 async function showGpsPermission() {
   let text = "Your browser will ask for location permission when you start GPS sharing.";
@@ -587,7 +636,22 @@ function bindEvents() {
     const sel = e.target.closest("[data-select-trip]"); if (sel) selectTrip(sel.dataset.selectTrip);
   });
   $("mobileMenuBtn").addEventListener("click", toggleDrawer); $("sidebarOverlay").addEventListener("click", closeDrawer);
-  $("notifBtn").addEventListener("click", () => showSection("notifications")); $("profileBtn").addEventListener("click", () => showSection("profile"));
+  $("notifBtn").addEventListener("click", () => { showSection("notifications"); fetchNotifs().then(renderNotifications); });
+  $("notifList").addEventListener("click", async e => {
+    const readButton = e.target.closest("[data-driver-read]");
+    if (readButton) {
+      try { await markDriverNotificationRead(readButton.dataset.driverRead); }
+      catch (err) { showBanner(err.message, true); }
+    }
+    if (e.target.closest("#driverMarkAllRead")) {
+      try { await markAllDriverNotificationsRead(); }
+      catch (err) { showBanner(err.message, true); }
+    }
+  });
+  document.querySelectorAll("#settingsSection [data-setting]").forEach(input => {
+    input.addEventListener("change", saveNotificationPreferences);
+  });
+  $("profileBtn").addEventListener("click", () => showSection("profile"));
   [$("logoutTop"), $("logoutSide"), $("logoutSettings")].forEach((b) => b.addEventListener("click", logout));
   $("refreshTripsBtn").addEventListener("click", refreshTrips);
   $("startTripBtn").addEventListener("click", () => tripAction("start"));

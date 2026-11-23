@@ -7,6 +7,7 @@ import uuid
 
 from backend.app.dependencies import get_current_user, require_admin
 from backend.app.database.connection import get_connection
+from backend.app.services.notifications import create_notification_if_enabled
 
 
 from backend.app.schemas.user import (
@@ -943,6 +944,25 @@ def update_route(
                 values
             )
             row = cursor.fetchone()
+
+            cursor.execute("""
+                SELECT DISTINCT s.user_id
+                FROM subscriptions sub
+                JOIN students s ON s.student_id = sub.student_id
+                WHERE sub.route_id = %s
+                  AND sub.is_active = TRUE
+            """, (route_id,))
+
+            for recipient in cursor.fetchall():
+                create_notification_if_enabled(
+                    cursor,
+                    recipient[0],
+                    "Route Updated",
+                    f"Route {row[1]} ({row[2]}) has been updated.",
+                    preference_key="routeUpdates",
+                    notification_type="ROUTE_UPDATED"
+                )
+
             conn.commit()
             return {
                 "message": "Route updated successfully",

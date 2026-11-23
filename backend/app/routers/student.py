@@ -1,3 +1,7 @@
+import time
+from urllib.request import Request, urlopen
+from urllib.parse import urlencode
+import json
 from datetime import timezone
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -9,6 +13,113 @@ router = APIRouter(
     prefix="/students",
     tags=["Students"]
 )
+
+
+# Campus road-distance configuration (OSRM / OpenStreetMap)
+CAMPUS_LAT = 13.219992
+CAMPUS_LNG = 77.753943
+_OSRM_DISTANCE_CACHE = {}
+_OSRM_CACHE_TTL = 21600
+
+
+def _add_campus_road_distances(stops):
+    now = time.time()
+    valid = []
+
+    for index, stop in enumerate(stops):
+        try:
+            lat = float(stop["latitude"])
+            lng = float(stop["longitude"])
+        except (TypeError, ValueError, KeyError):
+            continue
+
+        if not (-90 <= lat <= 90 and -180 <= lng <= 180):
+            continue
+        if lat == 0 or lng == 0:
+            continue
+
+        valid.append((index, lat, lng))
+
+    result = [
+        {**stop, "distance_to_campus_km": None}
+        for stop in stops
+    ]
+
+    if not valid:
+        return result
+
+    cache_key = tuple(
+        (round(lat, 6), round(lng, 6))
+        for _, lat, lng in valid
+    ) + ((round(CAMPUS_LAT, 6), round(CAMPUS_LNG, 6)),)
+
+    cached = _OSRM_DISTANCE_CACHE.get(cache_key)
+    distances = None
+
+    if cached and now - cached["time"] < _OSRM_CACHE_TTL:
+        distances = cached["distances"]
+
+    if distances is None:
+        coordinates = [
+            f"{lng},{lat}" for _, lat, lng in valid
+        ]
+        coordinates.append(f"{CAMPUS_LNG},{CAMPUS_LAT}")
+
+        params = urlencode({
+            "sources": ";".join(str(i) for i in range(len(valid))),
+            "destinations": str(len(valid)),
+            "annotations": "distance"
+        })
+
+        url = (
+            "https://router.project-osrm.org/table/v1/driving/"
+            + ";".join(coordinates) + "?" + params
+        )
+
+        try:
+            request = Request(
+                url,
+                headers={"User-Agent": "UniversityBusTracking/1.0"}
+            )
+            with urlopen(request, timeout=12) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+
+            if payload.get("code") != "Ok":
+                raise ValueError("OSRM returned non-Ok response")
+
+            matrix = payload.get("distances", [])
+            distances = [
+                row[0] if row and row[0] is not None else None
+                for row in matrix
+            ]
+
+            if len(distances) != len(valid):
+                raise ValueError("OSRM result count mismatch")
+
+            _OSRM_DISTANCE_CACHE[cache_key] = {
+                "time": now,
+                "distances": distances
+            }
+
+        except Exception as exc:
+            print(f"OSRM campus distance lookup failed: {exc}")
+            distances = [None] * len(valid)
+
+    for position, (original_index, lat, lng) in enumerate(valid):
+        name = str(stops[original_index].get("stop_name", "")).strip().lower()
+
+        if name in ("campus", "university campus"):
+            km = 0.0
+        else:
+            meters = distances[position]
+            km = round(meters / 1000, 2) if meters is not None else None
+
+        result[original_index]["distance_to_campus_km"] = (
+            f"{km:.2f}" if km is not None else None
+        )
+
+    return result
+
 
 
 # Logged-in student: View own profile
@@ -383,7 +494,7 @@ def get_all_route_stops(
 
             stops = cursor.fetchall()
 
-            return [
+            return _add_campus_road_distances([
                 {
                     "stop_id": stop[0],
                     "route_id": stop[1],
@@ -395,7 +506,7 @@ def get_all_route_stops(
                     "drop_time": str(stop[7]) if stop[7] is not None else None
                 }
                 for stop in stops
-            ]
+            ])
 
     finally:
         conn.close()
@@ -471,7 +582,7 @@ def get_my_route_stops(
 
             stops = cursor.fetchall()
 
-            return [
+            return _add_campus_road_distances([
                 {
                     "stop_id": stop[0],
                     "route_id": stop[1],
@@ -483,7 +594,7 @@ def get_my_route_stops(
                     "drop_time": str(stop[7]) if stop[7] is not None else None
                 }
                 for stop in stops
-            ]
+            ])
 
     finally:
         conn.close()
@@ -834,10 +945,66 @@ def get_route_bus_location(
             trip = cursor.fetchone()
 
             if not trip:
-                raise HTTPException(
-                    status_code=404,
-                    detail="No active bus trip found for this route"
-                )
+                # No active trip: return the latest real driver GPS
+                # saved by the geofence processor.
+                cursor.execute("""
+                    SELECT
+                        b.bus_id,
+                        b.bus_number,
+                        gs.last_latitude,
+                        gs.last_longitude,
+                        gs.updated_at
+                    FROM buses b
+                    LEFT JOIN bus_geofence_state gs
+                        ON gs.bus_id = b.bus_id
+                    WHERE b.route_id = %s
+                    ORDER BY b.bus_id
+                    LIMIT 1
+                """, (route_id,))
+
+                fallback = cursor.fetchone()
+
+                if not fallback:
+                    return {
+                        "route_id": route_id,
+                        "bus_available": False,
+                        "trip_id": None,
+                        "trip_status": "NO_ACTIVE_TRIP",
+                        "last_location": None,
+                        "message": "No bus assigned to this route"
+                    }
+
+                fallback_bus_id, fallback_bus_number = fallback[0], fallback[1]
+                fallback_location = None
+
+                if fallback[2] is not None and fallback[3] is not None:
+                    updated_at = fallback[4]
+                    fallback_location = {
+                        "latitude": float(fallback[2]),
+                        "longitude": float(fallback[3]),
+                        "speed": None,
+                        "recorded_at": (
+                            updated_at.replace(tzinfo=timezone.utc).isoformat()
+                            if updated_at and updated_at.tzinfo is None
+                            else updated_at.astimezone(timezone.utc).isoformat()
+                            if updated_at else None
+                        )
+                    }
+
+                return {
+                    "route_id": route_id,
+                    "trip_id": None,
+                    "bus_id": fallback_bus_id,
+                    "bus_number": fallback_bus_number,
+                    "trip_status": "NO_ACTIVE_TRIP",
+                    "bus_available": True,
+                    "last_location": fallback_location,
+                    "message": (
+                        "Showing latest driver GPS; no active trip"
+                        if fallback_location
+                        else "Waiting for driver GPS location"
+                    )
+                }
 
             trip_id = trip[0]
             bus_id = trip[1]

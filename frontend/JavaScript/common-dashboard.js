@@ -68,7 +68,7 @@ const CONFIG = {
       `/students/routes/${encodeURIComponent(routeId)}/bus`,
 
    routeLocation: (routeId) =>
-  `/students/routes/${encodeURIComponent(routeId)}/bus/location`,
+  `/students/me/routes/${encodeURIComponent(routeId)}/bus/location`,
 
     timetable: "/students/me/timetable",
 
@@ -1326,7 +1326,7 @@ async function pollLiveLocation() {
       const recordedAt = new Date(liveBus.recorded_at);
       const age = (Date.now() - recordedAt.getTime()) / 1000;
       const fresh = liveBus.gps_online === true &&
-        Number.isFinite(age) && age >= 0 && age <= 30;
+        Number.isFinite(age) && age >= 0 && age <= 60;
 
       setRouteGpsStatus(route, fresh);
       renderActiveJourneyTimelines();
@@ -1389,9 +1389,10 @@ async function pollLiveLocation() {
     const isFresh =
       Number.isFinite(ageInSeconds) &&
       ageInSeconds >= 0 &&
-      ageInSeconds <= 30;
+      ageInSeconds <= 60;
 
     setRouteGpsStatus(route, isFresh);
+    route.liveLocation = location;
     renderActiveJourneyTimelines();
 
     const liveDot = $("liveDot");
@@ -2305,6 +2306,62 @@ function renderNotifications() {
 
 /* ---------- Railway-style live journey timeline ---------- */
 
+function calculateLiveJourneyProgress(route, stops) {
+  const gps = route?.liveLocation;
+  if (!gps || !Array.isArray(stops) || !stops.length) return null;
+
+  const lat = Number(gps.latitude);
+  const lon = Number(gps.longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+
+  const valid = stops.map((stop, index) => ({
+    stop,
+    index,
+    lat: Number(stop.latitude ?? stop.stop_latitude ?? stop.lat),
+    lon: Number(stop.longitude ?? stop.stop_longitude ?? stop.lng ?? stop.lon)
+  })).filter(x => Number.isFinite(x.lat) && Number.isFinite(x.lon));
+
+  if (!valid.length) return null;
+
+  const rad = Math.PI / 180;
+  const distance = (aLat, aLon, bLat, bLon) => {
+    const dLat = (bLat - aLat) * rad;
+    const dLon = (bLon - aLon) * rad;
+    const h = Math.sin(dLat / 2) ** 2 +
+      Math.cos(aLat * rad) * Math.cos(bLat * rad) *
+      Math.sin(dLon / 2) ** 2;
+    return 6371 * 2 * Math.asin(Math.sqrt(h));
+  };
+
+  let nearest = valid[0];
+  let nearestKm = distance(lat, lon, nearest.lat, nearest.lon);
+
+  for (const item of valid.slice(1)) {
+    const km = distance(lat, lon, item.lat, item.lon);
+    if (km < nearestKm) {
+      nearest = item;
+      nearestKm = km;
+    }
+  }
+
+  const next = valid.find(x => x.index > nearest.index);
+  if (!next) {
+    return {
+      currentStop: nearest.stop.stop_name || "Last stop",
+      nextStop: "Destination reached",
+      nextDistanceKm: 0,
+      nextStopIndex: -1
+    };
+  }
+
+  return {
+    currentStop: nearest.stop.stop_name || `Stop ${nearest.index + 1}`,
+    nextStop: next.stop.stop_name || `Stop ${next.index + 1}`,
+    nextDistanceKm: distance(lat, lon, next.lat, next.lon),
+    nextStopIndex: next.index
+  };
+}
+
 function renderJourneyTimeline(route, targetId) {
   const target = $(targetId);
   if (!target) return;
@@ -2326,12 +2383,14 @@ function renderJourneyTimeline(route, targetId) {
   }
 
   const bus = route.busData || {};
+  const liveProgress = calculateLiveJourneyProgress(route, stops);
+
   const current = String(
-    bus.current_stop || route.current_stop || ""
+    liveProgress?.currentStop || bus.current_stop || route.current_stop || ""
   ).trim().toLowerCase();
 
   const next = String(
-    bus.next_stop || route.next_stop || ""
+    liveProgress?.nextStop || bus.next_stop || route.next_stop || ""
   ).trim().toLowerCase();
 
   const gpsOnline = route.gpsOnline === true ||
@@ -2366,10 +2425,8 @@ function renderJourneyTimeline(route, targetId) {
       statusLabel = "On time";
     }
 
-    const distance = stop.cumulative_distance_km ??
-      stop.distance_km ??
-      stop.distance ??
-      null;
+    // Fixed road distance from this stop to University Campus.
+    const distance = stop.distance_to_campus_km ?? null;
 
     const arrival = stop.actual_arrival_time ||
       stop.arrival_time ||
@@ -2436,8 +2493,12 @@ function renderJourneyTimeline(route, targetId) {
   }).join("");
 
   const destination = route.end_point || stops[stops.length - 1]?.stop_name || "Destination";
-  const currentStop = route.current_stop || bus.current_stop || "";
-  const nextStop = route.next_stop || bus.next_stop || "";
+  const currentStop =
+    liveProgress?.currentStop || route.current_stop || bus.current_stop || "";
+
+  const nextStop = liveProgress
+    ? `${liveProgress.nextStop} · ${liveProgress.nextDistanceKm.toFixed(2)} km`
+    : route.next_stop || bus.next_stop || "";
 
   target.innerHTML = `
     <div class="rail-journey">
@@ -2453,7 +2514,7 @@ function renderJourneyTimeline(route, targetId) {
       </div>
 
       <div class="rail-column-head">
-        <span>DISTANCE</span>
+        <span>CAMPUS DISTANCE</span>
         <span>ARRIVAL</span>
         <span>DEPARTURE</span>
       </div>
@@ -2468,7 +2529,7 @@ function renderJourneyTimeline(route, targetId) {
           <strong>${esc(currentStop || "Awaiting GPS")}</strong>
         </div>
         <div>
-          <small>NEXT STOP</small>
+          <small>LIVE BUS DISTANCE TO NEXT STOP</small>
           <strong>${esc(nextStop || "Awaiting GPS")}</strong>
         </div>
         <div>
@@ -3475,44 +3536,37 @@ function loadSettings() {
 }
 
 
-function initSettings() {
+async function initSettings() {
+  let settings = loadSettings();
 
-  const settings =
-    loadSettings();
+  try {
+    const result = await apiFetch("/notifications/preferences");
+    settings = { ...settings, ...(result.preferences || {}) };
+  } catch (error) {
+    console.error("Could not load saved notification preferences:", error);
+  }
 
+  $$("[data-setting]").forEach(input => {
+    const key = input.dataset.setting;
+    input.checked = Boolean(settings[key]);
 
-  $$("[data-setting]")
-    .forEach(
-      (input) => {
-
-        input.checked =
-          !!settings[
-            input.dataset.setting
-          ];
-
-
-        input.addEventListener(
-          "change",
-          () => {
-
-            settings[
-              input.dataset.setting
-            ] =
-              input.checked;
-
-
-            localStorage.setItem(
-              CONFIG.SETTINGS_KEY,
-              JSON.stringify(
-                settings
-              )
-            );
-
-          }
-        );
-
+    input.addEventListener("change", async () => {
+      settings[key] = input.checked;
+      try {
+        const result = await apiFetch("/notifications/preferences", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(settings)
+        });
+        settings = { ...settings, ...(result.preferences || {}) };
+      } catch (error) {
+        input.checked = !input.checked;
+        settings[key] = input.checked;
+        console.error("Could not save notification preferences:", error);
+        alert("Settings could not be saved. Please try again.");
       }
-    );
+    });
+  });
 }
 
 

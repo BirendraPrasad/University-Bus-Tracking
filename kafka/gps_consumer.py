@@ -53,11 +53,11 @@
 import json
 import os
 from datetime import datetime, timezone
-from zoneinfo import ZoneInfo
 
 from kafka import KafkaConsumer
 import psycopg
 from dotenv import load_dotenv
+from backend.app.services.notifications import create_notification_if_enabled
 
 load_dotenv()
 
@@ -90,7 +90,7 @@ for message in consumer:
     longitude = data["longitude"]
     speed = data.get("speed")
 
-    # Convert the original GPS timestamp to Asia/Kolkata local time.
+    # Store GPS timestamps consistently as UTC-naive values.
     raw_timestamp = data.get("recorded_at")
     if raw_timestamp:
         gps_time = datetime.fromisoformat(
@@ -98,13 +98,12 @@ for message in consumer:
         )
         if gps_time.tzinfo is None:
             gps_time = gps_time.replace(tzinfo=timezone.utc)
+        else:
+            gps_time = gps_time.astimezone(timezone.utc)
     else:
         gps_time = datetime.now(timezone.utc)
 
-    recorded_at = (
-        gps_time.astimezone(ZoneInfo("Asia/Kolkata"))
-        .replace(tzinfo=None)
-    )
+    recorded_at = gps_time.replace(tzinfo=None)
 
     try:
         # Find bus
@@ -133,7 +132,7 @@ for message in consumer:
 
         cursor.execute(
             """
-            SELECT trip_id
+            SELECT trip_id, route_id
             FROM trips
             WHERE trip_id = %s
               AND bus_id = %s
@@ -157,6 +156,69 @@ for message in consumer:
             """,
             (trip_id, bus_id, latitude, longitude, speed, recorded_at)
         )
+
+        # Detect the nearest unvisited stop within 100 metres.
+        trip_route_id = trip[1]
+
+        cursor.execute("""
+            SELECT s.stop_id, s.stop_name, s.latitude, s.longitude
+            FROM stops s
+            LEFT JOIN trip_stop_events e
+              ON e.trip_id = %s AND e.stop_id = s.stop_id
+            WHERE s.route_id = %s AND e.arrival_time IS NULL
+            ORDER BY s.stop_order
+        """, (trip_id, trip_route_id))
+
+        from math import radians, sin, cos, asin, sqrt
+
+        nearby_stops = []
+        for stop_id, stop_name, stop_lat, stop_lng in cursor.fetchall():
+            lat1, lon1, lat2, lon2 = map(
+                radians, (float(latitude), float(longitude),
+                          float(stop_lat), float(stop_lng))
+            )
+            dlat, dlon = lat2 - lat1, lon2 - lon1
+            a = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
+            distance = 6371000 * 2 * asin(sqrt(a))
+
+            if distance <= 100:
+                nearby_stops.append((distance, stop_id, stop_name))
+
+        if nearby_stops:
+            _, stop_id, stop_name = min(nearby_stops, key=lambda item: item[0])
+
+            cursor.execute("""
+                INSERT INTO trip_stop_events (trip_id, stop_id, arrival_time)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (trip_id, stop_id)
+                DO UPDATE SET
+                    arrival_time = COALESCE(
+                        trip_stop_events.arrival_time,
+                        EXCLUDED.arrival_time
+                    ),
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE trip_stop_events.arrival_time IS NULL
+                RETURNING event_id
+            """, (trip_id, stop_id, recorded_at))
+
+            if cursor.fetchone():
+                cursor.execute("""
+                    SELECT DISTINCT s.user_id
+                    FROM subscriptions sub
+                    JOIN students s ON s.student_id = sub.student_id
+                    WHERE sub.route_id = %s AND sub.is_active = TRUE
+                """, (trip_route_id,))
+
+                for recipient in cursor.fetchall():
+                    create_notification_if_enabled(
+                        cursor, recipient[0],
+                        "Bus Arrived at Stop",
+                        f"Bus {bus_number} has arrived at {stop_name}.",
+                        preference_key="busArrival",
+                        notification_type="BUS_ARRIVAL"
+                    )
+
+                print("Stop arrival detected:", stop_name)
 
         conn.commit()
 

@@ -296,7 +296,7 @@ function renderNotifications() {
     if (!item.is_read) {
       card.addEventListener("click", function () {
         apiMutation(
-          "/notifications//" + item.notification_id + "/read",
+          "/notifications/" + item.notification_id + "/read",
           "PATCH"
         ).then(function () {
           return loadNotifications();
@@ -315,7 +315,7 @@ var markAllBtn = el("button", "mark-all-notifications", "Mark All as Read");
 
 markAllBtn.type = "button";
 markAllBtn.addEventListener("click", function () {
-  apiMutation("/notifications//read-all", "PATCH")
+  apiMutation("/notifications/read-all", "PATCH")
     .then(function () {
       return loadNotifications();
     })

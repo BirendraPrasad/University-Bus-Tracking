@@ -12,7 +12,49 @@ from backend.app.routers import schedules
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 
-app = FastAPI(title="University Bus Tracking API")
+import asyncio
+import logging
+from contextlib import asynccontextmanager
+from backend.app.services.gps_watchdog import complete_stale_gps_trips
+
+logger = logging.getLogger(__name__)
+
+
+async def _gps_watchdog_loop():
+    while True:
+        try:
+            completed = await asyncio.to_thread(
+                complete_stale_gps_trips
+            )
+            if completed:
+                logger.warning(
+                    "GPS watchdog completed %s stale trip(s).",
+                    completed
+                )
+        except Exception:
+            logger.exception("GPS watchdog execution failed.")
+
+        await asyncio.sleep(5)
+
+
+@asynccontextmanager
+async def gps_watchdog_lifespan(app: FastAPI):
+    task = asyncio.create_task(
+        _gps_watchdog_loop(),
+        name="gps-watchdog"
+    )
+    try:
+        yield
+    finally:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+
+
+app = FastAPI(title="University Bus Tracking API", lifespan=gps_watchdog_lifespan)
 
 # Bus Photo Storage
 UPLOAD_DIR = Path("backend/uploads/buses")

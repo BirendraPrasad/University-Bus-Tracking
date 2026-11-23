@@ -1,4 +1,4 @@
-﻿"use strict";
+"use strict";
 /* Driver Dashboard - University Bus Tracking
    All driver, bus, route, stop, trip and notification data comes from FastAPI.
    The JWT is read from localStorage ONLY to authenticate requests; it is never a data source.
@@ -14,6 +14,7 @@ function gpsResumeStorageKey() { return `${GPS_RESUME_KEY}:${state.profile?.driv
 
 const ENDPOINTS = {
   profile: "/drivers/me",
+  route: "/drivers/me/route",
   trip: "/drivers/me/trip",
   available: "/drivers/me/trips/available",
   history: "/drivers/me/trips/history",
@@ -26,11 +27,12 @@ const ENDPOINTS = {
 
 const state = {
   profile: null,
+  assignedRoute: null, assignedRouteError: null,
   available: null, availableError: null, loadingTrips: true,
   serverTrip: null, serverTripError: null,
   selectedId: null,
   history: null, historyError: null,
-  notifs: null, notifError: null,
+  notifs: null, notifError: null, notificationPreferences: {},
   busy: false,
   gps: { status: "not_started", watchId: null, tripId: null, lastSent: 0, sending: false, lat: null, lng: null, time: null },
   maps: {}
@@ -43,8 +45,8 @@ const setText = (id, v) => { const el = $(id); if (el) el.textContent = v; };
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const dash = (v) => (v === null || v === undefined || v === "" ? "Not available" : v);
 const toDate = (iso) => { const d = new Date(iso); return isNaN(d) ? null : d; };
-const fmtDT = (iso) => { const d = iso ? toDate(iso) : null; return d ? d.toLocaleString() : "â€”"; };
-const fmtTime = (iso) => { const d = iso ? toDate(iso) : null; return d ? d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "â€”"; };
+const fmtDT = (iso) => { const d = iso ? toDate(iso) : null; return d ? d.toLocaleString() : "—"; };
+const fmtTime = (iso) => { const d = iso ? toDate(iso) : null; return d ? d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"; };
 const row = (l, v) => `<div class="info-row"><span>${esc(l)}</span><strong>${esc(dash(v))}</strong></div>`;
 const emptyMsg = (t) => `<div class="empty">${esc(t)}</div>`;
 const pick = (o, ...keys) => { for (const k of keys) if (o && o[k] !== undefined && o[k] !== null) return o[k]; return null; };
@@ -61,26 +63,35 @@ function setMsg(id, text, kind) { const el = $(id); if (!el) return; el.textCont
 
 /* ---------- auth + API ---------- */
 class ApiError extends Error { constructor(status, message, detail) { super(message); this.status = status; this.detail = detail; } }
+
 const getToken = () => {
+  // First get JWT from Android WebView bridge
   try {
     if (
       window.AndroidAuth &&
       typeof window.AndroidAuth.getAuthToken === "function"
     ) {
-      const nativeToken = window.AndroidAuth.getAuthToken();
-      if (nativeToken) return nativeToken;
+      const bridgeToken = window.AndroidAuth.getAuthToken();
+
+      if (bridgeToken) {
+        return bridgeToken;
+      }
     }
-  } catch (e) {
-    console.warn("Native authentication bridge unavailable.", e);
+  } catch (error) {
+    console.error("Android auth bridge error:", error);
   }
+
+  // Fallback for normal browser login
   for (const storage of [localStorage, sessionStorage]) {
     for (const k of TOKEN_KEYS) {
       const v = storage.getItem(k);
       if (v) return v;
     }
   }
+
   return null;
 };
+
 const clearToken = () => {
   for (const storage of [localStorage, sessionStorage]) {
     TOKEN_KEYS.forEach((k) => storage.removeItem(k));
@@ -127,7 +138,7 @@ function normalizeTrip(r) {
       registration_number: pick(bus, "registration_number") ?? pick(r, "registration_number"),
       front_photo: pick(bus, "front_photo") ?? pick(r, "front_photo"),
       side_photo: pick(bus, "side_photo") ?? pick(r, "side_photo")
-    },
+    },    
     route: { route_code: pick(route, "route_code") ?? pick(r, "route_code"), route_name: pick(route, "route_name") ?? pick(r, "route_name"),
       start_point: pick(route, "start_point") ?? pick(r, "start_point"), end_point: pick(route, "end_point") ?? pick(r, "end_point") },
     stops: Array.isArray(r.stops) ? r.stops : null, last_location: r.last_location || null
@@ -165,6 +176,32 @@ const tripBus = () => {
 
 
 /* ---------- data loading ---------- */
+async function fetchAssignedRoute() {
+  try {
+    const data = await api(ENDPOINTS.route);
+    state.assignedRoute = data && typeof data === "object" ? data : null;
+    state.assignedRouteError = null;
+  } catch (e) {
+    state.assignedRoute = null;
+    state.assignedRouteError = e;
+  }
+}
+function assignedRouteAsTrip() {
+  const r = state.assignedRoute;
+  if (!r) return null;
+  return {
+    trip_id: null,
+    bus: state.profile?.bus || {},
+    route: {
+      route_code: r.route_code,
+      route_name: r.route_name,
+      start_point: r.start_point,
+      end_point: r.end_point
+    },
+    stops: Array.isArray(r.stops) ? r.stops : [],
+    last_location: null
+  };
+}
 async function fetchServerTrip() {
   const q = state.selectedId !== null ? `?trip_id=${encodeURIComponent(state.selectedId)}` : "";
   try { state.serverTrip = normalizeTrip(await api(ENDPOINTS.trip + q)); state.serverTripError = null; }
@@ -184,8 +221,47 @@ async function fetchHistory() {
   } catch (e) { state.history = null; state.historyError = e; }
 }
 async function fetchNotifs() {
-  try { const d = await api(ENDPOINTS.notifications); state.notifs = Array.isArray(d) ? d : []; state.notifError = null; }
-  catch (e) { state.notifs = null; state.notifError = e; }
+  try {
+    const d = await api("/notifications/");
+    state.notifs = Array.isArray(d.notifications) ? d.notifications : [];
+    state.unreadCount = Number(d.unread_count || 0);
+    state.notifError = null;
+  } catch (e) { state.notifs = null; state.notifError = e; }
+}
+async function loadNotificationPreferences() {
+  try {
+    const d = await api("/notifications/preferences");
+    state.notificationPreferences = d.preferences || {};
+    document.querySelectorAll("#settingsSection [data-setting]").forEach(input => {
+      input.checked = Boolean(state.notificationPreferences[input.dataset.setting]);
+    });
+  } catch (e) { showBanner("Could not load notification preferences: " + e.message, true); }
+}
+async function saveNotificationPreferences() {
+  const preferences = { ...state.notificationPreferences };
+  document.querySelectorAll("#settingsSection [data-setting]").forEach(input => {
+    preferences[input.dataset.setting] = input.checked;
+  });
+  try {
+    const d = await api("/notifications/preferences", {
+      method: "PUT", body: JSON.stringify(preferences)
+    });
+    state.notificationPreferences = d.preferences || preferences;
+    showBanner("Notification preferences saved.", false);
+  } catch (e) {
+    showBanner("Could not save preferences: " + e.message, true);
+    await loadNotificationPreferences();
+  }
+}
+async function markDriverNotificationRead(id) {
+  await api(`/notifications/${encodeURIComponent(id)}/read`, { method: "PATCH" });
+  await fetchNotifs();
+  renderNotifications();
+}
+async function markAllDriverNotificationsRead() {
+  await api("/notifications/read-all", { method: "PATCH" });
+  await fetchNotifs();
+  renderNotifications();
 }
 async function loadTripData() {
   state.loadingTrips = true; renderTrips();
@@ -193,7 +269,7 @@ async function loadTripData() {
   state.loadingTrips = false;
 }
 async function initialLoad() {
-  await Promise.all([loadTripData(), fetchNotifs()]);
+  await Promise.all([loadTripData(), fetchNotifs(), fetchAssignedRoute()]);
   // Default selection: backend's current trip if it is available, otherwise an active available trip.
   if (state.selectedId === null && state.available && state.available.length) {
     const srv = state.serverTrip;
@@ -248,22 +324,25 @@ function renderBusPhotos(bus) {
 
 
 function renderDashboard() {
-  const t = currentTrip(), bus = tripBus(), stops = t && t.stops;
+  const t = currentTrip(), routeView = t || assignedRouteAsTrip();
+  const bus = tripBus(), stops = routeView?.stops;
   renderBusPhotos(bus);
 
   setText("cBusNumber", bus ? dash(bus.bus_number) : "No bus assigned");
-  setText("cBusMeta", bus ? `${dash(busType(bus.bus_type))} Â· ${dash(bus.registration_number)}` : "Ask the transport office");
-  setText("cRouteCode", t ? dash(t.route.route_code) : "â€”"); setText("cRouteName", t ? dash(t.route.route_name) : "No trip selected");
-  setText("cRoutePoints", t ? `${dash(t.route.start_point)} â†’ ${dash(t.route.end_point)}` : "");
-  setText("cTripStatus", t ? statusLabel(t.status) : "No trip"); setText("cTripSub", t ? `Trip #${t.trip_id} Â· ${dash(t.trip_date)}` : "Select a trip to begin");
+  setText("cBusMeta", bus ? `${dash(busType(bus.bus_type))} · ${dash(bus.registration_number)}` : "Ask the transport office");
+  setText("cRouteCode", routeView ? dash(routeView.route.route_code) : "—");
+  setText("cRouteName", routeView ? dash(routeView.route.route_name) : "No route assigned");
+  setText("cRoutePoints", routeView ? `${dash(routeView.route.start_point)} → ${dash(routeView.route.end_point)}` : "");
+  setText("cTripStatus", t ? statusLabel(t.status) : "No trip");
+  setText("cTripSub", t ? `Trip #${t.trip_id} · ${dash(t.trip_date)}` : "Waiting for automatic trip");
   const g = GPS_LABEL[state.gps.status];
   setText("cGpsStatus", g[2]); setText("cGpsSub", state.gps.time ? `Updated ${fmtTime(state.gps.time)}` : "Not sharing location");
   setText("cNextStop", "Not available"); setText("cNextSub", "Stop progress is not tracked yet");
-  setText("cProgress", stops ? `${stops.length} stops` : "â€”");
-  setText("cProgressSub", stops ? "Total stops. Current and completed stops are not tracked yet." : (t ? "Stop list not available for this trip" : "â€”"));
-
+  setText("cProgress", stops ? `${stops.length} stops` : "—");
+  setText("cProgressSub", stops ? "Assigned route stops. Current and completed stops are not tracked yet." : "Route stop list not available.");
+  
   $("dashBus").innerHTML = bus ? row("Bus number", bus.bus_number) + row("Bus type", busType(bus.bus_type)) + row("Registration number", bus.registration_number) +
-    row("Capacity", bus.capacity ? `${bus.capacity} seats` : null) + row("Assignment", t ? `Trip #${t.trip_id} Â· ${statusLabel(t.status)}` : "No trip selected") : emptyMsg("No bus is assigned to you yet.");
+    row("Capacity", bus.capacity ? `${bus.capacity} seats` : null) + row("Assignment", t ? `Trip #${t.trip_id} · ${statusLabel(t.status)}` : "No trip selected") : emptyMsg("No bus is assigned to you yet.");
 }
 function renderDriverJourneyTimeline(t, targetId) {
   const box = $(targetId);
@@ -308,7 +387,7 @@ function renderDriverJourneyTimeline(t, targetId) {
         </div>
         <div class="driver-journey-content">
           <strong>${esc(stop.stop_name || "Unnamed stop")}</strong>
-          <span class="driver-journey-status">Scheduled stop Â· Order ${esc(String(stop.stop_order ?? index + 1))}</span>
+          <span class="driver-journey-status">Scheduled stop · Order ${esc(String(stop.stop_order ?? index + 1))}</span>
           <div class="driver-journey-times">${timing}</div>
         </div>
       </div>`;
@@ -319,7 +398,7 @@ function renderDriverJourneyTimeline(t, targetId) {
 function renderBus() {
   const bus = tripBus(), t = currentTrip();
   renderBusPhotos(bus);
-  renderDriverJourneyTimeline(t, "driverBusJourneyTimeline");
+  renderDriverJourneyTimeline(t || assignedRouteAsTrip(), "driverBusJourneyTimeline");
 
   $("busDetails").innerHTML = bus ? row("Bus number", bus.bus_number) + row("Bus type", busType(bus.bus_type)) + row("Registration number", bus.registration_number) +
     row("Capacity", bus.capacity ? `${bus.capacity} seats` : null) + row("Driver", state.profile.name) +
@@ -327,15 +406,18 @@ function renderBus() {
 }
 function stopsMissingText(t) { return t ? "Stops for this trip are not available. If you selected a trip other than the server's current one, the backend needs the optional trip_id support on GET /drivers/me/trip." : "Select a trip to see its route."; }
 function renderRoute() {
-  const t = currentTrip();
-  renderDriverJourneyTimeline(t, "driverRouteJourneyTimeline");
-  $("routeInfo").innerHTML = t ? row("Route code", t.route.route_code) + row("Route name", t.route.route_name) + row("Start point", t.route.start_point) + row("End point", t.route.end_point)
-    : emptyMsg(state.serverTripError && state.selectedId === null ? state.serverTripError.message : "No trip selected.");
-  $("stopsList").innerHTML = t && t.stops && t.stops.length ? t.stops.map((s) => {
+  const t = currentTrip(), routeView = t || assignedRouteAsTrip();
+  renderDriverJourneyTimeline(routeView, "driverRouteJourneyTimeline");
+  $("routeInfo").innerHTML = routeView
+    ? row("Route code", routeView.route.route_code) + row("Route name", routeView.route.route_name) +
+      row("Start point", routeView.route.start_point) + row("End point", routeView.route.end_point)
+    : emptyMsg(state.assignedRouteError ? state.assignedRouteError.message : "No route assigned to your bus.");
+  const stops = routeView?.stops || [];
+  $("stopsList").innerHTML = stops.length ? stops.map((s) => {
     const lat = Number(s.latitude), lng = Number(s.longitude);
     return `<div class="stop-item"><span class="stop-no">${esc(String(s.stop_order ?? "").padStart(2, "0"))}</span><strong>${esc(s.stop_name)}</strong>
-      <span class="stop-coords">${isFinite(lat) && isFinite(lng) ? `${lat.toFixed(5)}, ${lng.toFixed(5)}` : "â€”"}</span></div>`;
-  }).join("") : emptyMsg(t && t.stops ? "No stops found for this route." : stopsMissingText(t));
+      <span class="stop-coords">${isFinite(lat) && isFinite(lng) ? `${lat.toFixed(5)}, ${lng.toFixed(5)}` : "—"}</span></div>`;
+  }).join("") : emptyMsg(routeView ? "No stops found for this route." : "Assigned route stops are not available.");
   renderMaps();
 }
 function renderTrips() {
@@ -351,8 +433,8 @@ function renderTrips() {
       <div class="trip-card-top"><strong>Trip #${esc(t.trip_id)}</strong>${statusBadge(t.status)}</div>
       <div class="trip-meta">
         <div><span>Bus</span><b>${esc(dash(t.bus.bus_number))}</b></div><div><span>Date</span><b>${esc(dash(t.trip_date))}</b></div>
-        <div class="full"><span>Route</span><b>${esc(dash(t.route.route_code))} Â· ${esc(dash(t.route.route_name))}</b></div>
-        <div class="full"><span>From â†’ To</span><b>${esc(dash(t.route.start_point))} â†’ ${esc(dash(t.route.end_point))}</b></div>
+        <div class="full"><span>Route</span><b>${esc(dash(t.route.route_code))} · ${esc(dash(t.route.route_name))}</b></div>
+        <div class="full"><span>From → To</span><b>${esc(dash(t.route.start_point))} → ${esc(dash(t.route.end_point))}</b></div>
         <div><span>Start time</span><b>${esc(t.start_time ? fmtTime(t.start_time) : "Not started")}</b></div>
       </div>
       <button class="btn ${sel ? "outline" : "primary"}" type="button" data-select-trip="${esc(t.trip_id)}" aria-pressed="${sel}" ${state.busy ? "disabled" : ""}>${sel ? "Selected" : "Select Trip"}</button></article>`;
@@ -370,7 +452,7 @@ function renderTrip() {
 function renderGps() {
   const g = state.gps, [cls, label] = GPS_LABEL[g.status], t = currentTrip();
   $("gpsBadge").className = `badge ${cls}`; setText("gpsBadge", label);
-  setText("gpsLat", g.lat !== null ? g.lat.toFixed(6) : "â€”"); setText("gpsLng", g.lng !== null ? g.lng.toFixed(6) : "â€”"); setText("gpsUpdated", g.time ? fmtDT(g.time) : "â€”");
+  setText("gpsLat", g.lat !== null ? g.lat.toFixed(6) : "—"); setText("gpsLng", g.lng !== null ? g.lng.toFixed(6) : "—"); setText("gpsUpdated", g.time ? fmtDT(g.time) : "—");
   const running = g.status === "active" || g.status === "requesting";
   $("startGpsBtn").disabled = running || !state.profile?.bus; $("stopGpsBtn").disabled = !running;
   renderDashboard();
@@ -380,7 +462,7 @@ function renderHistory() {
   if (state.loadingTrips && !h) {
     body.innerHTML = "";
     empty.hidden = false;
-    empty.textContent = "Loading trip historyâ€¦";
+    empty.textContent = "Loading trip history…";
     return;
   }
   if (!h) {
@@ -418,16 +500,22 @@ function renderHistory() {
     </tr>`).join("");
 
     return `<tr><td colspan="7" style="font-weight:700;background:var(--surface-2,#eef2f7);padding:12px">
-      ${esc(date)} â€” Total: ${trips.length} | Completed: ${completed} | Active: ${active}
+      ${esc(date)} — Total: ${trips.length} | Completed: ${completed} | Active: ${active}
     </td></tr>${rows}`;
   }).join("");
 }
 function renderNotifications() {
   const n = state.notifs;
-  $("notifDot").hidden = !(n && n.some((x) => !x.is_read));
-  $("notifList").innerHTML = !n ? emptyMsg(state.notifError && state.notifError.status !== 404 ? state.notifError.message : "No notifications available yet.")
-    : n.length ? n.map((x) => `<div class="notif-item ${x.is_read ? "" : "unread"}"><div><strong>${esc(x.title)}</strong><p>${esc(x.message)}</p>
-      <small>${esc(fmtDT(x.created_at))} Â· ${x.is_read ? "Read" : "Unread"}</small></div></div>`).join("") : emptyMsg("No notifications available yet.");
+  $("notifDot").hidden = !(n && n.some(x => !x.is_read));
+  const markAll = n && n.some(x => !x.is_read)
+    ? '<button class="btn outline" id="driverMarkAllRead" type="button">Mark all as read</button>' : "";
+  $("notifList").innerHTML = !n
+    ? emptyMsg(state.notifError ? state.notifError.message : "No notifications available yet.")
+    : markAll + (n.length ? n.map(x => `<div class="notif-item ${x.is_read ? "" : "unread"}">
+        <div><strong>${esc(x.title)}</strong><p>${esc(x.message)}</p>
+        <small>${esc(fmtDT(x.created_at))} · ${x.is_read ? "Read" : "Unread"}</small>
+        ${x.is_read ? "" : `<button class="btn outline" type="button" data-driver-read="${esc(x.notification_id)}">Mark as read</button>`}
+        </div></div>`).join("") : emptyMsg("No notifications available yet."));
 }
 function renderProfile() {
   const p = state.profile, bus = p.bus;
@@ -451,7 +539,8 @@ function renderMaps() { Object.keys(MAP_TARGETS).forEach(renderMap); }
 function renderMap(key) {
   const m = ensureMap(key); if (!m) return;
   m.layer.clearLayers(); m.me = null;
-  const t = currentTrip(), pts = [], stops = (t && t.stops) || [];
+  const t = currentTrip(), routeView = t || assignedRouteAsTrip();
+  const pts = [], stops = (routeView && routeView.stops) || [];
   stops.forEach((s) => {
     const lat = Number(s.latitude), lng = Number(s.longitude); if (!isFinite(lat) || !isFinite(lng)) return;
     pts.push([lat, lng]);
@@ -466,12 +555,12 @@ function renderMap(key) {
   if (state.gps.lat !== null) { pts.push([state.gps.lat, state.gps.lng]); placeDeviceMarker(m); }
   if (pts.length) m.map.fitBounds(pts, { padding: [30, 30], maxZoom: 16 });
   const [, noteId, labelId] = MAP_TARGETS[key];
-  if (labelId) setText(labelId, t ? `${dash(t.route.route_code)} Â· ${dash(t.route.start_point)} â†’ ${dash(t.route.end_point)}` : "");
-  setText(noteId, !t ? "No trip selected, so there is no route to show."
-    : !stops.length ? "Stops for this trip are not available."
-    : state.gps.status === "active" ? "Your device position is shown in red. The dashed line joins stops in order; it is not the road path."
-    : ll ? "Green marker: last bus position stored by the backend. The dashed line joins stops in order; it is not the road path."
-    : "GPS not started. No bus position available yet. The dashed line joins stops in order; it is not the road path.");
+  if (labelId) setText(labelId, routeView ? `${dash(routeView.route.route_code)} · ${dash(routeView.route.start_point)} → ${dash(routeView.route.end_point)}` : "");
+  setText(noteId, !routeView ? "No assigned route is available."
+    : !stops.length ? "Stops for this assigned route are not available."
+    : state.gps.status === "active" ? "Your device position is shown in red. The dashed line joins assigned route stops in order; it is not the road path."
+    : ll ? "Green marker: last bus position stored by the backend. The dashed line joins assigned route stops in order; it is not the road path."
+    : "GPS not started. No bus position available yet. The dashed line joins assigned route stops in order; it is not the road path.");
 }
 function placeDeviceMarker(m) {
   const p = [state.gps.lat, state.gps.lng];
@@ -500,7 +589,7 @@ async function refreshTrips() {
 async function tripAction(kind) {
   const t = currentTrip(); if (!t || state.busy) return;
   state.busy = true; const btn = $(kind === "start" ? "startTripBtn" : "endTripBtn");
-  renderAll(); btn.classList.add("busy"); setMsg("tripMsg", kind === "start" ? "Starting tripâ€¦" : "Ending tripâ€¦", "");
+  renderAll(); btn.classList.add("busy"); setMsg("tripMsg", kind === "start" ? "Starting trip…" : "Ending trip…", "");
   try {
     await api(kind === "start" ? ENDPOINTS.start(t.trip_id) : ENDPOINTS.end(t.trip_id), { method: "POST" });
     if (kind === "end") stopGps(false);
@@ -518,7 +607,7 @@ function startGps() {
   if (state.gps.watchId !== null) return;
   if (!window.isSecureContext) { setMsg("gpsNote", "GPS requires HTTPS. Open the driver dashboard using a secure HTTPS connection.", "error"); return; }
   localStorage.setItem(gpsResumeStorageKey(), "true");
-  setMsg("gpsNote", "Waiting for location permissionâ€¦", "");
+  setMsg("gpsNote", "Waiting for location permission…", "");
   state.gps.status = "requesting"; state.gps.tripId = null; renderGps();
   state.gps.watchId = navigator.geolocation.watchPosition(onGpsSuccess, onGpsError, { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 });
 }
@@ -585,7 +674,10 @@ function showSection(page) {
   $$(".menu-item[data-page]").forEach((m) => m.classList.toggle("active", m.dataset.page === page));
   setText("pageTitle", TITLES[page]); closeDrawer(); window.scrollTo({ top: 0 });
   if (page === "dashboard" || page === "route") { renderMaps(); setTimeout(() => Object.values(state.maps).forEach((m) => m.map.invalidateSize()), 120); }
-  if (page === "settings") showGpsPermission();
+  if (page === "settings") {
+    showGpsPermission();
+    loadNotificationPreferences();
+  }
 }
 async function showGpsPermission() {
   let text = "Your browser will ask for location permission when you start GPS sharing.";
@@ -599,7 +691,22 @@ function bindEvents() {
     const sel = e.target.closest("[data-select-trip]"); if (sel) selectTrip(sel.dataset.selectTrip);
   });
   $("mobileMenuBtn").addEventListener("click", toggleDrawer); $("sidebarOverlay").addEventListener("click", closeDrawer);
-  $("notifBtn").addEventListener("click", () => showSection("notifications")); $("profileBtn").addEventListener("click", () => showSection("profile"));
+  $("notifBtn").addEventListener("click", () => { showSection("notifications"); fetchNotifs().then(renderNotifications); });
+  $("notifList").addEventListener("click", async e => {
+    const readButton = e.target.closest("[data-driver-read]");
+    if (readButton) {
+      try { await markDriverNotificationRead(readButton.dataset.driverRead); }
+      catch (err) { showBanner(err.message, true); }
+    }
+    if (e.target.closest("#driverMarkAllRead")) {
+      try { await markAllDriverNotificationsRead(); }
+      catch (err) { showBanner(err.message, true); }
+    }
+  });
+  document.querySelectorAll("#settingsSection [data-setting]").forEach(input => {
+    input.addEventListener("change", saveNotificationPreferences);
+  });
+  $("profileBtn").addEventListener("click", () => showSection("profile"));
   [$("logoutTop"), $("logoutSide"), $("logoutSettings")].forEach((b) => b.addEventListener("click", logout));
   $("refreshTripsBtn").addEventListener("click", refreshTrips);
   $("startTripBtn").addEventListener("click", () => tripAction("start"));

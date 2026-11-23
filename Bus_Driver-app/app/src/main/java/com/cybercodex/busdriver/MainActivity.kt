@@ -32,6 +32,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import androidx.compose.ui.platform.LocalContext
+
+
+
 private val Navy = Color(0xFF102A43)
 private val Blue = Color(0xFF1976D2)
 private val LightBlue = Color(0xFFEAF3FC)
@@ -46,8 +50,17 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
+
+
 @Composable
 fun DriverLoginScreen() {
+    val context = LocalContext.current
+
+    val sessionPrefs = remember {
+        context.getSharedPreferences("driver_session", android.content.Context.MODE_PRIVATE)
+    }
+
     var routeId by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -56,11 +69,58 @@ fun DriverLoginScreen() {
     var message by remember { mutableStateOf("") }
     var profile by remember { mutableStateOf<DriverProfileResponse?>(null) }
     var accessToken by remember { mutableStateOf<String?>(null) }
+    var isRestoringSession by remember { mutableStateOf(true) }
+
     val scope = rememberCoroutineScope()
-    if (profile != null) {
+
+    // Restore and validate the saved login session on app launch.
+    LaunchedEffect(Unit) {
+        val savedToken = sessionPrefs.getString("access_token", null)
+
+        if (!savedToken.isNullOrBlank()) {
+            try {
+                val response = withContext(Dispatchers.IO) {
+                    ApiClient.authApi.getMyProfile("Bearer $savedToken")
+                }
+
+                if (response.isSuccessful) {
+                    val savedProfile = response.body()
+
+                    if (savedProfile != null) {
+                        accessToken = savedToken
+                        profile = savedProfile
+                    } else {
+                        sessionPrefs.edit().remove("access_token").apply()
+                    }
+                } else {
+                    sessionPrefs.edit().remove("access_token").apply()
+                }
+            } catch (e: Exception) {
+                // Keep the saved token if the backend is temporarily unavailable.
+                message = "Unable to verify saved session. Check backend connection."
+            }
+        }
+
+        isRestoringSession = false
+    }
+
+    if (isRestoringSession) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = Background
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = Blue)
+            }
+        }
+        return
+    }
+
+    if (profile != null && accessToken != null) {
         DriverWebViewScreen(
-            accessToken = accessToken ?: "",
+            accessToken = accessToken!!,
             onLogout = {
+                sessionPrefs.edit().remove("access_token").apply()
                 profile = null
                 accessToken = null
                 routeId = ""
@@ -71,6 +131,7 @@ fun DriverLoginScreen() {
         )
         return
     }
+
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = Background
@@ -103,15 +164,15 @@ fun DriverLoginScreen() {
                 }
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    "UNIVERSITY BUS",
-                    fontSize = 26.sp,
+                    "UNIVERSITY BUS TRACKING",
+                    fontSize = 22.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = Color.White,
                     letterSpacing = 1.5.sp
                 )
                 Text(
                     "DRIVER APPLICATION",
-                    fontSize = 12.sp,
+                    fontSize = 10.sp,
                     color = Color(0xFFD6E8FA),
                     fontWeight = FontWeight.SemiBold,
                     letterSpacing = 2.sp
@@ -291,12 +352,21 @@ fun DriverLoginScreen() {
                                                             )
                                                         }
                                                         if (profileResponse.isSuccessful) {
-                                                            accessToken = loginResult.access_token
-                                                            profile = profileResponse.body()
-                                                            if (profile == null) {
+                                                            val loadedProfile = profileResponse.body()
+
+                                                            if (loadedProfile != null) {
+                                                                sessionPrefs.edit()
+                                                                    .putString("access_token", loginResult.access_token)
+                                                                    .apply()
+
+                                                                accessToken = loginResult.access_token
+                                                                profile = loadedProfile
+                                                            } else {
                                                                 message = "Profile response was empty."
                                                             }
-                                                        } else {
+                                                        }
+
+                                                        else {
                                                             message = "Login successful, but profile loading failed (HTTP ${profileResponse.code()})."
                                                         }
                                                     }
@@ -405,8 +475,8 @@ fun DriverDashboardScreen(
                 .padding(20.dp)
         ) {
             Text(
-                "UNIVERSITY BUS",
-                fontSize = 13.sp,
+                "UNIVERSITY BUS TRACKING",
+                fontSize = 12.sp,
                 color = Blue,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.5.sp

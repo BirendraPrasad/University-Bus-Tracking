@@ -237,7 +237,12 @@
     <section id="settingsSection" class="page-section">
       <div class="card"><h2>Account</h2><div id="setInfo"></div></div>
       <div class="card"><h2>GPS permission</h2><p id="setGpsPerm" class="note flush"></p></div>
-      <div class="card"><h2>Notifications</h2><p class="note flush">Notification preferences cannot be changed yet. Messages from transport administration appear under Notifications.</p></div>
+      <div class="card">
+        <h2>Notification Preferences</h2>
+        <div class="setting-row"><div><strong>Bus Arrival Notifications</strong><p class="note flush">Receive bus arrival alerts.</p></div><label class="switch"><input type="checkbox" data-setting="busArrival"><span class="slider"></span></label></div>
+        <div class="setting-row"><div><strong>Route Updates</strong><p class="note flush">Receive route change alerts.</p></div><label class="switch"><input type="checkbox" data-setting="routeUpdates"><span class="slider"></span></label></div>
+        <div class="setting-row"><div><strong>Timetable Reminders</strong><p class="note flush">Receive timetable reminders.</p></div><label class="switch"><input type="checkbox" data-setting="timetableReminders"><span class="slider"></span></label></div>
+      </div>
       <div class="card"><button class="btn outline" id="logoutSettings" type="button">Logout</button></div>
     </section>
 

@@ -1,0 +1,153 @@
+from backend.app.database.connection import get_connection
+from backend.app.services.notifications import create_notification_if_enabled
+
+
+GPS_TIMEOUT_SECONDS = 30
+WATCHDOG_LOCK_ID = 740021
+
+
+def complete_stale_gps_trips():
+    """
+    Complete trips when no fresh server-received GPS update
+    has arrived for 30 seconds.
+    """
+    conn = get_connection()
+    completed_count = 0
+
+    try:
+        with conn.cursor() as cur:
+            # Prevent overlapping watchdog sweeps across workers.
+            cur.execute(
+                "SELECT pg_try_advisory_xact_lock(%s)",
+                (WATCHDOG_LOCK_ID,)
+            )
+            if not cur.fetchone()[0]:
+                return 0
+
+            cur.execute("""
+                SELECT
+                    t.trip_id,
+                    t.bus_id,
+                    t.route_id,
+                    t.driver_id,
+                    t.source,
+                    b.bus_number
+                FROM trips t
+                JOIN buses b ON b.bus_id = t.bus_id
+                LEFT JOIN bus_geofence_state real_state
+                    ON real_state.bus_id = t.bus_id
+                   AND t.source = 'REAL'
+                LEFT JOIN bus_geofence_simulator_state sim_state
+                    ON sim_state.bus_id = t.bus_id
+                   AND t.source = 'SIMULATED'
+                WHERE t.status = 'ACTIVE'
+                  AND (
+                    CASE
+                        WHEN t.source = 'REAL'
+                            THEN real_state.updated_at
+                        WHEN t.source = 'SIMULATED'
+                            THEN sim_state.updated_at
+                    END IS NULL
+                    OR
+                    CASE
+                        WHEN t.source = 'REAL'
+                            THEN real_state.updated_at
+                        WHEN t.source = 'SIMULATED'
+                            THEN sim_state.updated_at
+                    END < CURRENT_TIMESTAMP
+                        - (%s * INTERVAL '1 second')
+                  )
+                ORDER BY t.trip_id
+                FOR UPDATE OF t SKIP LOCKED
+            """, (GPS_TIMEOUT_SECONDS,))
+
+            stale_trips = cur.fetchall()
+
+            for trip in stale_trips:
+                trip_id, bus_id, route_id, driver_id, source, bus_number = trip
+
+                cur.execute("""
+                    UPDATE trips
+                    SET status = 'COMPLETED',
+                        end_time = CURRENT_TIMESTAMP
+                    WHERE trip_id = %s
+                      AND status = 'ACTIVE'
+                    RETURNING trip_id
+                """, (trip_id,))
+
+                if not cur.fetchone():
+                    continue
+
+                # Require a fresh campus entry before another departure
+                # can automatically start a new trip.
+                state_table = (
+                    "bus_geofence_state"
+                    if source == "REAL"
+                    else "bus_geofence_simulator_state"
+                )
+
+                cur.execute(f"""
+                    UPDATE {state_table}
+                    SET is_inside = FALSE
+                    WHERE bus_id = %s
+                """, (bus_id,))
+
+                cur.execute("""
+                    DELETE FROM bus_geofence_validation_state
+                    WHERE bus_id = %s AND source = %s
+                """, (bus_id, source))
+
+                # Simulation events must not notify real users.
+                if source == "REAL":
+                    recipient_ids = set()
+
+                    if driver_id is not None:
+                        cur.execute("""
+                            SELECT user_id
+                            FROM drivers
+                            WHERE driver_id = %s
+                        """, (driver_id,))
+                        driver_user = cur.fetchone()
+
+                        if driver_user:
+                            recipient_ids.add(driver_user[0])
+
+                    cur.execute("""
+                        SELECT DISTINCT s.user_id
+                        FROM subscriptions sub
+                        JOIN students s
+                          ON s.student_id = sub.student_id
+                        WHERE sub.route_id = %s
+                          AND sub.is_active = TRUE
+                    """, (route_id,))
+
+                    recipient_ids.update(
+                        row[0] for row in cur.fetchall()
+                    )
+
+                    for recipient_id in recipient_ids:
+                        create_notification_if_enabled(
+                            cur,
+                            recipient_id,
+                            "Bus GPS Disconnected",
+                            (
+                                f"Bus {bus_number}: trip #{trip_id} "
+                                f"was automatically completed because "
+                                f"GPS updates stopped for "
+                                f"{GPS_TIMEOUT_SECONDS} seconds."
+                            ),
+                            preference_key="tripAlerts",
+                            notification_type="GPS_TIMEOUT"
+                        )
+
+                completed_count += 1
+
+        conn.commit()
+        return completed_count
+
+    except Exception:
+        conn.rollback()
+        raise
+
+    finally:
+        conn.close()

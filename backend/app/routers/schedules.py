@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 from backend.app.dependencies import require_admin
 from backend.app.database.connection import get_connection
+from backend.app.services.notifications import create_notification_if_enabled
 
 router = APIRouter(prefix="/schedules", tags=["Schedules"])
 
@@ -15,7 +16,16 @@ class ScheduleCreate(BaseModel):
     route_id: int = Field(gt=0)
     departure_time: time
     arrival_time: time | None = None
-    day_of_week: str = Field(default="WORKING_DAYS", max_length=20)
+    day_of_week: Literal[
+        "WORKING_DAYS",
+        "MONDAY",
+        "TUESDAY",
+        "WEDNESDAY",
+        "THURSDAY",
+        "FRIDAY",
+        "SATURDAY",
+        "SUNDAY"
+    ] = "WORKING_DAYS"
     direction: Literal["OUTBOUND", "RETURN"]
 
 
@@ -128,6 +138,23 @@ def create_schedule(
             ))
 
             schedule_id = cur.fetchone()[0]
+
+            cur.execute("""
+                SELECT DISTINCT s.user_id
+                FROM subscriptions sub
+                JOIN students s ON s.student_id = sub.student_id
+                WHERE sub.route_id = %s AND sub.is_active = TRUE
+            """, (schedule.route_id,))
+
+            for recipient in cur.fetchall():
+                create_notification_if_enabled(
+                    cur, recipient[0],
+                    "Timetable Updated",
+                    f"A new bus schedule has been added for route {schedule.route_id}.",
+                    preference_key="timetableReminders",
+                    notification_type="TIMETABLE_UPDATED"
+                )
+
             conn.commit()
 
             return {
@@ -155,11 +182,13 @@ def update_schedule(
     try:
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT schedule_id FROM schedules WHERE schedule_id = %s",
+                "SELECT schedule_id, route_id FROM schedules WHERE schedule_id = %s FOR UPDATE",
                 (schedule_id,),
             )
-            if not cur.fetchone():
+            existing_schedule = cur.fetchone()
+            if not existing_schedule:
                 raise HTTPException(status_code=404, detail="Schedule not found")
+            old_route_id = existing_schedule[1]
 
             cur.execute("SELECT bus_id FROM buses WHERE bus_id = %s", (schedule.bus_id,))
             if not cur.fetchone():
@@ -195,6 +224,23 @@ def update_schedule(
                 schedule.arrival_time, schedule.day_of_week,
                 schedule.direction, schedule_id,
             ))
+            affected_route_ids = list({old_route_id, schedule.route_id})
+            cur.execute("""
+                SELECT DISTINCT s.user_id
+                FROM subscriptions sub
+                JOIN students s ON s.student_id = sub.student_id
+                WHERE sub.route_id = ANY(%s) AND sub.is_active = TRUE
+            """, (affected_route_ids,))
+
+            for recipient in cur.fetchall():
+                create_notification_if_enabled(
+                    cur, recipient[0],
+                    "Timetable Updated",
+                    "A bus timetable has been changed. Please check the latest schedule.",
+                    preference_key="timetableReminders",
+                    notification_type="TIMETABLE_UPDATED"
+                )
+
             conn.commit()
             return {"message": "Schedule updated successfully"}
     except HTTPException:

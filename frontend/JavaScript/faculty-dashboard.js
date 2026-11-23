@@ -29,7 +29,8 @@ const state = {
   notifications: [],
   map: null,
   busMarkers: [],
-  settings: { compactTables: false, showRecentNotifications: true }
+  settings: { compactTables: false, showRecentNotifications: true },
+  notificationPreferences: {}
 };
 
 const $ = id => document.getElementById(id);
@@ -343,6 +344,41 @@ function setupSettings() {
   });
   document.body.classList.toggle("compact-tables", Boolean(state.settings.compactTables));
 }
+async function setupNotificationSettings() {
+  const keys = ["busArrival", "routeUpdates", "timetableReminders"];
+
+  try {
+    const result = await api("/notifications/preferences");
+    state.notificationPreferences = result.preferences || {};
+
+    document.querySelectorAll("[data-notification-setting]").forEach(input => {
+      input.checked = Boolean(state.notificationPreferences[input.dataset.notificationSetting]);
+
+      input.addEventListener("change", async () => {
+        const key = input.dataset.notificationSetting;
+        const previous = Boolean(state.notificationPreferences[key]);
+        state.notificationPreferences[key] = input.checked;
+
+        try {
+          const saved = await api("/notifications/preferences", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(state.notificationPreferences)
+          });
+          state.notificationPreferences = saved.preferences || state.notificationPreferences;
+          toast("Notification preference saved.");
+        } catch (error) {
+          input.checked = previous;
+          state.notificationPreferences[key] = previous;
+          toast("Could not save preference: " + error.message);
+        }
+      });
+    });
+  } catch (error) {
+    console.error("Could not load notification preferences:", error);
+    toast("Could not load notification preferences.");
+  }
+}
 async function loadProfile() {
   const p = await api("/faculty/me");
   if (p.role !== "FACULTY") throw new Error("Faculty profile validation failed.");
@@ -405,7 +441,7 @@ async function init() {
   if (!requireFaculty()) return;
   setText("currentDate", new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }));
   setText("footerYear", new Date().getFullYear());
-  setupEvents(); setupSearch(); setupSettings();
+  setupEvents(); setupSearch(); setupSettings(); await setupNotificationSettings();
   const tasks = [
     ["Profile", loadProfile], ["Summary", loadSummary], ["Routes", loadRoutes],
     ["Buses", loadBuses], ["Timetable", loadTimetable], ["Stops", loadStops], ["Trips", loadTrips], ["Live GPS", loadLiveBuses],
