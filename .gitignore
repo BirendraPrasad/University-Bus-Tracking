@@ -42,3 +42,6 @@ Bus_Driver-app/backup_before_*/
 # Runtime logs
 backend.log
 frontend.log
+
+# Superset private configuration
+superset/docker/pythonpath_dev/superset_config.py
