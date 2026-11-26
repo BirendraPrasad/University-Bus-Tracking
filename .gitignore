@@ -38,3 +38,7 @@ Bus_Driver-app/backup_before_*/
 .env
 .env.*
 !.env.example
+
+# Runtime logs
+backend.log
+frontend.log

@@ -1,0 +1,4 @@
+.env
+*.env
+config/superset_config.py
+*.secret
