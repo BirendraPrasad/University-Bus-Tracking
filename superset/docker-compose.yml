@@ -130,11 +130,11 @@ services:
 
 volumes:
   superset_home:
-    external: true
+    external: false
     name: superset_superset_home
   db_home:
-    external: true
+    external: false
     name: superset_db_home
   redis:
-    external: true
+    external: false
     name: superset_redis
