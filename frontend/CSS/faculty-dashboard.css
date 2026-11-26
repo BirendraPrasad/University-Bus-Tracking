@@ -1122,3 +1122,43 @@ a{color:inherit;text-decoration:none}
 
 
 /* ======================================================================================================================================================== */
+
+
+/* Faculty live GPS detail cards */
+.faculty-gps-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: 10px;
+  background: #f5f8fc;
+}
+.faculty-gps-details > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.faculty-gps-details span {
+  color: var(--muted);
+  font-size: 11px;
+}
+.faculty-gps-details strong {
+  color: var(--navy);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.faculty-map-popup {
+  line-height: 1.7;
+  min-width: 170px;
+}
+.faculty-map-popup strong {
+  display: block;
+  margin-bottom: 4px;
+}
+@media (max-width: 600px) {
+  .faculty-gps-details {
+    grid-template-columns: 1fr 1fr;
+  }
+}

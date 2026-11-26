@@ -33,6 +33,9 @@ const state = {
   notificationPreferences: {}
 };
 
+let liveBusPollTimer = null;
+let liveBusPollInFlight = false;
+
 const $ = id => document.getElementById(id);
 const esc = value => String(value ?? "").replace(/[&<>"']/g, ch => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
@@ -210,6 +213,43 @@ function renderTrips() {
     <td>${fmtDateTime(t.start_time)}</td><td>${fmtDateTime(t.end_time)}</td></tr>`).join("") :
     `<tr><td colspan="8">No trip records available.</td></tr>`;
 }
+function formatSpeedKmh(speed) {
+  const value = Number(speed);
+  return Number.isFinite(value) && value >= 0
+    ? `${(value * 3.6).toFixed(1)} km/h` : "—";
+}
+
+function formatDistance(metres) {
+  const value = Number(metres);
+  if (!Number.isFinite(value) || value < 0) return "—";
+  return value >= 1000
+    ? `${(value / 1000).toFixed(2)} km`
+    : `${Math.round(value)} m`;
+}
+
+function formatEta(minutes) {
+  const value = Number(minutes);
+  return Number.isFinite(value) && value >= 0
+    ? `${Math.max(1, Math.round(value))} min` : "—";
+}
+
+function gpsAgeLabel(value) {
+  if (!value) return "No GPS update";
+  let dateValue = String(value);
+  if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(dateValue)) dateValue += "Z";
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return "Time unavailable";
+  const seconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
+  if (seconds < 60) return `${seconds}s ago`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  return `${Math.floor(seconds / 3600)}h ago`;
+}
+
+function gpsLabel(bus) {
+  if (!validCoordinates(bus)) return "GPS Offline";
+  return bus.gps_online ? "GPS Online" : "GPS Stale";
+}
+
 function renderLiveBuses() {
   const online = state.liveBuses.filter(b => b.gps_online && validCoordinates(b));
   setText("gpsOnlineStat", online.length);
@@ -217,22 +257,56 @@ function renderLiveBuses() {
     ? `${online.length} bus(es) reporting fresh GPS coordinates`
     : "No buses currently reporting fresh GPS coordinates");
   $("gpsLiveDot")?.classList.toggle("on", online.length > 0);
+
   const list = $("liveBusList");
-  if (list) list.innerHTML = state.liveBuses.length ? state.liveBuses.map(b => `
-    <div class="live-bus-item"><div class="live-bus-heading"><strong>${esc(b.bus_number)}</strong>
-      <span class="status-badge ${b.gps_online && validCoordinates(b) ? "ok" : "warn"}">${b.gps_online && validCoordinates(b) ? "GPS Online" : "GPS Offline"}</span></div>
-      <span>${esc(b.route_name)}</span><small>Driver: ${esc(b.driver_name || "Unassigned")}</small>
-      <small>Last update: ${fmtDateTime(b.recorded_at)}</small></div>`).join("") :
-    `<div class="empty-state">There are no active trips to track.</div>`;
+  if (list) {
+    list.innerHTML = state.liveBuses.length ? state.liveBuses.map(b => {
+      const isOnline = Boolean(b.gps_online && validCoordinates(b));
+      return `<div class="live-bus-item">
+        <div class="live-bus-heading">
+          <strong>${esc(b.bus_number || "Bus")}</strong>
+          <span class="status-badge ${isOnline ? "ok" : "warn"}">${gpsLabel(b)}</span>
+        </div>
+        <span>${esc(b.route_name || "Route unavailable")}</span>
+        <small>Driver: ${esc(b.driver_name || "Unassigned")}</small>
+        <div class="faculty-gps-details">
+          <div><span>Speed</span><strong>${formatSpeedKmh(b.speed)}</strong></div>
+          <div><span>Current stop</span><strong>${esc(b.current_stop || "—")}</strong></div>
+          <div><span>Next stop</span><strong>${esc(b.next_stop || "—")}</strong></div>
+          <div><span>Distance to next</span><strong>${formatDistance(b.distance_to_next_stop_m)}</strong></div>
+          <div><span>Approx. ETA</span><strong>${formatEta(b.eta_minutes)}</strong></div>
+          <div><span>GPS updated</span><strong>${gpsAgeLabel(b.recorded_at)}</strong></div>
+        </div>
+        <small>Last update: ${fmtDateTime(b.recorded_at)}</small>
+      </div>`;
+    }).join("") : `<div class="empty-state">There are no active trips to track.</div>`;
+  }
+
   if (state.map) {
     state.busMarkers.forEach(marker => state.map.removeLayer(marker));
     state.busMarkers = [];
+
     online.forEach(b => {
-      const marker = L.marker([Number(b.latitude), Number(b.longitude)]).addTo(state.map)
-        .bindPopup(`<strong>${esc(b.bus_number)}</strong><br>${esc(b.route_name)}<br>Driver: ${esc(b.driver_name || "—")}<br>Updated: ${fmtDateTime(b.recorded_at)}`);
+      const popup = `
+        <div class="faculty-map-popup">
+          <strong>${esc(b.bus_number || "Bus")}</strong>
+          <div>${esc(b.route_name || "Route unavailable")}</div>
+          <div>Driver: ${esc(b.driver_name || "Unassigned")}</div>
+          <div>Speed: ${formatSpeedKmh(b.speed)}</div>
+          <div>Current stop: ${esc(b.current_stop || "—")}</div>
+          <div>Next stop: ${esc(b.next_stop || "—")}</div>
+          <div>Distance: ${formatDistance(b.distance_to_next_stop_m)}</div>
+          <div>Approx. ETA: ${formatEta(b.eta_minutes)}</div>
+          <div>Updated: ${gpsAgeLabel(b.recorded_at)}</div>
+        </div>`;
+      const marker = L.marker([Number(b.latitude), Number(b.longitude)])
+        .addTo(state.map).bindPopup(popup);
       state.busMarkers.push(marker);
     });
-    if (online.length) state.map.fitBounds(L.featureGroup(state.busMarkers).getBounds().pad(0.2));
+
+    if (online.length) {
+      state.map.fitBounds(L.featureGroup(state.busMarkers).getBounds().pad(0.2));
+    }
   }
 }
 function renderNotifications() {
@@ -390,7 +464,27 @@ async function loadBuses() { state.buses = await api("/faculty/buses"); renderBu
 async function loadTimetable() { state.timetable = await api("/faculty/timetable"); renderTimetable(); }
 async function loadStops() { state.stops = await api("/faculty/stops"); renderStops(); }
 async function loadTrips() { state.trips = await api("/faculty/trips"); renderTrips(); }
-async function loadLiveBuses() { state.liveBuses = await api("/faculty/live-buses"); renderLiveBuses(); }
+async function loadLiveBuses() {
+  if (liveBusPollInFlight) return;
+  liveBusPollInFlight = true;
+  try {
+    state.liveBuses = await api("/faculty/live-buses");
+    renderLiveBuses();
+  } finally {
+    liveBusPollInFlight = false;
+  }
+}
+
+function startLiveBusPolling() {
+  if (liveBusPollTimer) clearInterval(liveBusPollTimer);
+  liveBusPollTimer = setInterval(() => {
+    if (document.visibilityState === "visible") {
+      loadLiveBuses().catch(error =>
+        console.warn("Live GPS refresh failed:", error)
+      );
+    }
+  }, 10000);
+}
 async function loadNotifications() {
   const result = await api("/notifications/");
   state.notifications = Array.isArray(result.notifications) ? result.notifications : [];
@@ -450,5 +544,6 @@ async function init() {
   await Promise.all(tasks.map(([name, fn]) => runLoad(name, fn)));
   renderSummary(state.summary || {});
   renderLiveBuses();
+  startLiveBusPolling();
 }
 document.addEventListener("DOMContentLoaded", init);

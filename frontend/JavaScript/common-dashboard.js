@@ -147,6 +147,7 @@ const state = {
   allBuses: [],
   facultyStops: [],
   liveBuses: [],
+  facultyMarkers: {},
 
   timetable: [],
 
@@ -1292,162 +1293,311 @@ function updateBusInfo(
 
 
 
-async function pollLiveLocation() {
-  if (String(state.user?.role || "").toUpperCase() === "FACULTY") {
-    const route = state.activeRoute;
-    if (!route) return;
+function facultyGpsAge(value) {
+  if (!value) return "No GPS update";
+  let raw = String(value);
+  if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(raw)) raw += "Z";
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return "Time unavailable";
+  const seconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
+  if (seconds < 60) return `${seconds}s ago`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  return `${Math.floor(seconds / 3600)}h ago`;
+}
 
+function facultySpeed(speed) {
+  const value = Number(speed);
+  return Number.isFinite(value) && value >= 0
+    ? `${(value * 3.6).toFixed(1)} km/h` : "—";
+}
+
+function facultyDistance(distance) {
+  const value = Number(distance);
+  if (!Number.isFinite(value) || value < 0) return "—";
+  return value >= 1000
+    ? `${(value / 1000).toFixed(2)} km`
+    : `${Math.round(value)} m`;
+}
+
+function facultyEta(minutes) {
+  const value = Number(minutes);
+  return Number.isFinite(value) && value >= 0
+    ? `${Math.max(1, Math.round(value))} min` : "—";
+}
+
+function renderFacultyFleet() {
+  const buses = state.liveBuses || [];
+  const online = buses.filter(bus => {
+    const lat = Number(bus.latitude), lng = Number(bus.longitude);
+    return bus.gps_online === true &&
+      Number.isFinite(lat) && Number.isFinite(lng) &&
+      lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180 &&
+      !(lat === 0 && lng === 0);
+  });
+
+  const panel = $("facultyFleetPanel");
+  if (panel) panel.hidden = false;
+
+  setText("facultyFleetCount", `${buses.length} buses`);
+  setText("facultyFleetStatus",
+    `${online.length} online · ${buses.length - online.length} offline or stale`);
+
+  const list = $("facultyFleetList");
+  if (list) {
+    list.innerHTML = buses.length ? buses.map(bus => {
+      const lat = Number(bus.latitude), lng = Number(bus.longitude);
+      const valid = Number.isFinite(lat) && Number.isFinite(lng) &&
+        lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180 &&
+        !(lat === 0 && lng === 0);
+      const fresh = bus.gps_online === true && valid;
+      const status = fresh ? "GPS Online" : valid ? "GPS Stale" : "GPS Offline";
+
+      return `<article class="faculty-fleet-card">
+        <div class="faculty-fleet-card-head">
+          <strong>${esc(bus.bus_number || "University Bus")}</strong>
+          <span class="status-badge ${fresh ? "ok" : "warn"}">${status}</span>
+        </div>
+        <p>${esc(bus.route_name || "Route unavailable")}</p>
+        <small>Driver: ${esc(bus.driver_name || "Unassigned")}</small>
+        <div class="faculty-fleet-metrics">
+          <div><span>Speed</span><strong>${facultySpeed(bus.speed)}</strong></div>
+          <div><span>Current stop</span><strong>${esc(bus.current_stop || "—")}</strong></div>
+          <div><span>Next stop</span><strong>${esc(bus.next_stop || "—")}</strong></div>
+          <div><span>Distance to next</span><strong>${facultyDistance(bus.distance_to_next_stop_m)}</strong></div>
+          <div><span>Approx. ETA</span><strong>${facultyEta(bus.eta_minutes)}</strong></div>
+          <div><span>GPS updated</span><strong>${facultyGpsAge(bus.recorded_at)}</strong></div>
+        </div>
+        <small>Last update: ${esc(bus.recorded_at || "Not available")}</small>
+      </article>`;
+    }).join("") : `<div class="empty-state">No active buses are available right now.</div>`;
+  }
+
+  // Use the existing tracking map, but maintain a separate marker per bus.
+  const map = state.maps.tracking;
+  if (!map || typeof L === "undefined") return;
+
+  const previousKeys = Object.keys(state.facultyMarkers);
+  const hadMarkers = previousKeys.length > 0;
+  const activeKeys = new Set();
+
+  online.forEach(bus => {
+    const key = String(bus.trip_id ?? bus.bus_id ?? bus.bus_number);
+    activeKeys.add(key);
+    const lat = Number(bus.latitude), lng = Number(bus.longitude);
+
+    const popup = `
+      <div class="faculty-fleet-popup">
+        <strong>${esc(bus.bus_number || "Bus")}</strong>
+        <div>${esc(bus.route_name || "Route unavailable")}</div>
+        <div>Driver: ${esc(bus.driver_name || "Unassigned")}</div>
+        <div>Speed: ${facultySpeed(bus.speed)}</div>
+        <div>Current stop: ${esc(bus.current_stop || "—")}</div>
+        <div>Next stop: ${esc(bus.next_stop || "—")}</div>
+        <div>Distance: ${facultyDistance(bus.distance_to_next_stop_m)}</div>
+        <div>Approx. ETA: ${facultyEta(bus.eta_minutes)}</div>
+        <div>Updated: ${facultyGpsAge(bus.recorded_at)}</div>
+      </div>`;
+
+    if (!state.facultyMarkers[key]) {
+      state.facultyMarkers[key] = L.marker([lat, lng]).addTo(map);
+    } else {
+      state.facultyMarkers[key].setLatLng([lat, lng]);
+    }
+    state.facultyMarkers[key].bindPopup(popup);
+  });
+
+  Object.entries(state.facultyMarkers).forEach(([key, marker]) => {
+    if (!activeKeys.has(key)) {
+      map.removeLayer(marker);
+      delete state.facultyMarkers[key];
+    }
+  });
+
+  if (!hadMarkers && online.length) {
+    const points = online.map(bus => [
+      Number(bus.latitude), Number(bus.longitude)
+    ]);
+    if (points.length === 1) map.setView(points[0], 15);
+    else map.fitBounds(L.latLngBounds(points), { padding: [30, 30] });
+  }
+}
+
+async function pollLiveLocation() {
+  const role = String(state.user?.role || "").toUpperCase();
+
+  if (role === "FACULTY") {
+    if (state.facultyPollInFlight) return;
+    state.facultyPollInFlight = true;
     try {
       const response = await apiFetch("/faculty/live-buses");
       state.liveBuses = facultyList(response, ["live_buses", "buses"]);
 
-      const busNumber = route.busData?.bus_number || route.bus_number;
-      const liveBus = state.liveBuses.find(
-        item => String(item.bus_number) === String(busNumber)
-      );
+      // Sync the selected faculty route with its live fleet GPS data.
+      const activeRoute = state.activeRoute;
+      if (activeRoute) {
+        const liveBus = state.liveBuses.find(bus =>
+          String(bus.bus_number) === String(
+            activeRoute.bus_number || activeRoute.busData?.bus_number
+          )
+        );
 
-      const validGPS = liveBus &&
-        typeof liveBus.latitude === "number" &&
-        typeof liveBus.longitude === "number";
+        if (liveBus) {
+          activeRoute.liveLocation = {
+            latitude: liveBus.latitude,
+            longitude: liveBus.longitude,
+            speed: liveBus.speed,
+            recorded_at: liveBus.recorded_at
+          };
+          activeRoute.gpsOnline = liveBus.gps_online === true;
+          activeRoute.current_stop = liveBus.current_stop;
+          activeRoute.next_stop = liveBus.next_stop;
+          activeRoute.distance_to_next_stop_m = liveBus.distance_to_next_stop_m;
+          activeRoute.eta_minutes = liveBus.eta_minutes;
 
-      if (!validGPS) {
-        setRouteGpsStatus(route, false);
-        const dot = $("liveDot");
-        const message = $("trkMessage");
-        if (dot) dot.classList.remove("on");
-        if (message) message.classList.remove("on");
-        setText("mapUpdated", "Waiting for GPS location");
-        setText("trkMessage", "GPS Offline - location not available");
-        return;
+          // Render the selected faculty route and its live bus position.
+          const liveLatitude = Number(liveBus.latitude);
+          const liveLongitude = Number(liveBus.longitude);
+
+          if (
+            Number.isFinite(liveLatitude) &&
+            Number.isFinite(liveLongitude) &&
+            liveLatitude >= -90 && liveLatitude <= 90 &&
+            liveLongitude >= -180 && liveLongitude <= 180 &&
+            !(liveLatitude === 0 && liveLongitude === 0)
+          ) {
+            const facultyMapRouteKey = `FACULTY:${activeRoute.id}`;
+
+            if (
+              Array.isArray(activeRoute.stopsData) &&
+              activeRoute.stopsData.length &&
+              state.activeMapRouteId !== facultyMapRouteKey
+            ) {
+              renderRouteStopsOnMap(activeRoute);
+              state.activeMapRouteId = facultyMapRouteKey;
+              refreshMaps();
+            }
+
+            updateBusLocation(liveLatitude, liveLongitude, false);
+          }
+        }
       }
 
-      updateBusLocation(liveBus.latitude, liveBus.longitude, false);
-
-      const recordedAt = new Date(liveBus.recorded_at);
-      const age = (Date.now() - recordedAt.getTime()) / 1000;
-      const fresh = liveBus.gps_online === true &&
-        Number.isFinite(age) && age >= 0 && age <= 60;
-
-      setRouteGpsStatus(route, fresh);
+      renderFacultyFleet();
       renderActiveJourneyTimelines();
 
-      const dot = $("liveDot");
-      const message = $("trkMessage");
-      if (dot) dot.classList.toggle("on", fresh);
-      if (message) message.classList.toggle("on", fresh);
+      // Faculty: show the nearest upcoming bus arrival.
+      const upcoming = state.liveBuses
+        .filter(bus =>
+          bus.next_stop &&
+          bus.eta_minutes !== null &&
+          bus.eta_minutes !== undefined &&
+          Number.isFinite(Number(bus.eta_minutes)) &&
+          Number(bus.eta_minutes) >= 0
+        )
+        .sort((a, b) => Number(a.eta_minutes) - Number(b.eta_minutes));
 
-      setText("trkMessage", fresh
-        ? "Live GPS received"
-        : "Showing last known GPS location");
-      setText("mapUpdated", fresh
-        ? "GPS updated recently"
-        : "GPS data is not recent");
-
+      if (upcoming.length) {
+        const nearest = upcoming[0];
+        setText("statNext", fmtEta(Number(nearest.eta_minutes)));
+        setText(
+          "statNextStop",
+          `${nearest.next_stop} · ${nearest.bus_number || "University Bus"}`
+        );
+      } else {
+        setText("statNext", "—");
+        setText("statNextStop", "GPS pending");
+      }
     } catch (error) {
-      console.warn("Faculty GPS polling failed:", error.message);
+      console.warn("Faculty fleet GPS polling failed:", error.message);
+      setText("facultyFleetStatus", "Unable to refresh live bus locations");
+    } finally {
+      state.facultyPollInFlight = false;
     }
     return;
   }
 
   const route = state.activeRoute;
-
-  if (!route || !route.id) {
-    return;
-  }
+  if (!route || !route.id) return;
 
   try {
     const data = await getRouteLocation(route.id);
     const location = data?.last_location;
 
-    if (
-      !location ||
-      typeof location.latitude !== "number" ||
-      typeof location.longitude !== "number"
-    ) {
+    if (!location ||
+        typeof location.latitude !== "number" ||
+        typeof location.longitude !== "number") {
       setRouteGpsStatus(route, false);
-      const liveDot = $("liveDot");
-      const trackingMessage = $("trkMessage");
-      if (liveDot) liveDot.classList.remove("on");
-      if (trackingMessage) trackingMessage.classList.remove("on");
+      const dot = $("liveDot");
+      const message = $("trkMessage");
+      if (dot) dot.classList.remove("on");
+      if (message) message.classList.remove("on");
       setText("mapUpdated", "Waiting for GPS location");
       setText("trkMessage", "GPS Offline - location not available");
       return;
     }
 
-    // Show the latest location received from backend.
-    updateBusLocation(
-      location.latitude,
-      location.longitude,
-      false
-    );
+    // Render this student's selected/subscribed route on the map.
+    if (
+      state.maps?.tracking &&
+      Array.isArray(route.stopsData) &&
+      route.stopsData.length &&
+      state.activeMapRouteId !== String(route.id)
+    ) {
+      renderRouteStopsOnMap(route);
+      state.activeMapRouteId = String(route.id);
+      refreshMaps();
+    }
 
-    // Check whether the GPS record is fresh.
-    const recordedAt = new Date(location.recorded_at);
-    const ageInSeconds =
-      (Date.now() - recordedAt.getTime()) / 1000;
-
-    const isFresh =
-      Number.isFinite(ageInSeconds) &&
-      ageInSeconds >= 0 &&
-      ageInSeconds <= 60;
-
-    setRouteGpsStatus(route, isFresh);
+    // Sync live API journey details with the student dashboard.
+    route.current_stop = data.current_stop ?? null;
+    route.next_stop = data.next_stop ?? null;
+    route.distance_to_next_stop_m = data.distance_to_next_stop_m ?? null;
+    route.eta_minutes = data.eta_minutes ?? null;
     route.liveLocation = location;
+
+    updateBusLocation(location.latitude, location.longitude, false);
+    const recordedAt = new Date(location.recorded_at);
+    const age = (Date.now() - recordedAt.getTime()) / 1000;
+    const fresh = Number.isFinite(age) && age >= 0 && age <= 60;
+
+    setRouteGpsStatus(route, fresh);
+    route.liveLocation = location;
+    renderStudentLiveBusCard();
     renderActiveJourneyTimelines();
 
-    const liveDot = $("liveDot");
-    const trackingMessage = $("trkMessage");
+    const dot = $("liveDot");
+    const message = $("trkMessage");
+    if (dot) dot.classList.toggle("on", fresh);
+    if (message) message.classList.toggle("on", fresh);
 
-    if (liveDot) {
-      liveDot.classList.toggle("on", isFresh);
-    }
-
-    if (trackingMessage) {
-      trackingMessage.classList.toggle("on", isFresh);
-    }
-
-    if (isFresh) {
-      setText("trkMessage", "Live GPS received");
-      setText("mapUpdated", "GPS updated recently");
-    } else {
-      setText("trkMessage", "Showing last known GPS location");
-      setText("mapUpdated", "GPS data is not recent");
-    }
-
+    setText("trkMessage", fresh
+      ? "Live GPS received" : "Showing last known GPS location");
+    setText("mapUpdated", fresh
+      ? "GPS updated recently" : "GPS data is not recent");
   } catch (error) {
     console.warn("GPS polling failed:", error.message);
     setRouteGpsStatus(route, false);
-    const liveDot = $("liveDot");
-    const trackingMessage = $("trkMessage");
-    if (liveDot) liveDot.classList.remove("on");
-    if (trackingMessage) trackingMessage.classList.remove("on");
+    const dot = $("liveDot");
+    const message = $("trkMessage");
+    if (dot) dot.classList.remove("on");
+    if (message) message.classList.remove("on");
     setText("trkMessage", "GPS Offline - unable to fetch location");
     setText("mapUpdated", "GPS status unavailable");
   }
 }
 
-
 function startLivePolling() {
   clearInterval(state.pollTimer);
-
   state.pollTimer = null;
 
-  if (!state.activeRoute || !state.activeRoute.id) {
+  const role = String(state.user?.role || "").toUpperCase();
+  if (role !== "FACULTY" && (!state.activeRoute || !state.activeRoute.id)) {
     return;
   }
 
   pollLiveLocation();
-
-  state.pollTimer = setInterval(
-    pollLiveLocation,
-    CONFIG.LIVE_POLL_MS
-  );
+  state.pollTimer = setInterval(pollLiveLocation, CONFIG.LIVE_POLL_MS);
 }
-
-
-
-
-
 
 /* ==========================================================
    9. RENDERERS
@@ -1565,81 +1715,58 @@ function renderHeader() {
 /* ---------- Stats ---------- */
 
 function renderStats() {
+  const role = String(state.user?.role || "").toUpperCase();
 
-  const running =
-    state.routes.filter(
-      (route) =>
-        isRunning(
-          route.status
-        )
-    );
+  if (role === "FACULTY") {
+    const buses = state.liveBuses || [];
 
+    setText("statRoutes", state.routes.length);
+    setText("statActive", buses.length);
+    setText("statTrips", state.timetable.length);
 
-  const etas =
-    state.routes
-      .map(
-        (route) =>
-          route.eta_minutes
+    const upcoming = buses
+      .filter(bus =>
+        bus.next_stop &&
+        bus.eta_minutes !== null &&
+        bus.eta_minutes !== undefined &&
+        Number.isFinite(Number(bus.eta_minutes)) &&
+        Number(bus.eta_minutes) >= 0
       )
-      .filter(
-        (minutes) =>
-          typeof minutes === "number"
+      .sort((a, b) => Number(a.eta_minutes) - Number(b.eta_minutes));
+
+    if (upcoming.length) {
+      const nearest = upcoming[0];
+      setText("statNext", fmtEta(Number(nearest.eta_minutes)));
+      setText(
+        "statNextStop",
+        `${nearest.next_stop} · ${nearest.bus_number || "University Bus"}`
       );
+    } else {
+      setText("statNext", "—");
+      setText("statNextStop", "GPS pending");
+    }
+    return;
+  }
 
+  const running = state.routes.filter(route => isRunning(route.status));
 
-  const next =
-    state.routes
-      .filter(
-        (route) =>
-          typeof route.eta_minutes === "number"
-      )
-      .sort(
-        (a, b) =>
-          a.eta_minutes -
-          b.eta_minutes
-      )[0];
+  const etas = state.routes
+    .map(route => route.eta_minutes)
+    .filter(minutes => typeof minutes === "number");
 
+  const next = state.routes
+    .filter(route => typeof route.eta_minutes === "number")
+    .sort((a, b) => a.eta_minutes - b.eta_minutes)[0];
 
-  setText(
-    "statRoutes",
-    state.routes.length
-  );
-
-
-  setText(
-    "statActive",
-    running.length
-  );
-
-
-  setText(
-    "statTrips",
-    state.timetable.length
-  );
-
-
-  setText(
-    "statNext",
-    etas.length
-      ? fmtEta(
-          Math.min(...etas)
-        )
-      : "—"
-  );
-
-
+  setText("statRoutes", state.routes.length);
+  setText("statActive", running.length);
+  setText("statTrips", state.timetable.length);
+  setText("statNext", etas.length ? fmtEta(Math.min(...etas)) : "—");
   setText(
     "statNextStop",
-
-    next &&
-    next.current_stop
-
-      ? `At ${next.current_stop}`
-
-      : "GPS pending"
+    next && next.current_stop ? `At ${next.current_stop}` : "GPS pending"
   );
 }
-
 
 /* ---------- Dashboard route list ---------- */
 
@@ -2348,6 +2475,7 @@ function calculateLiveJourneyProgress(route, stops) {
   if (!next) {
     return {
       currentStop: nearest.stop.stop_name || "Last stop",
+      currentStopIndex: nearest.index,
       nextStop: "Destination reached",
       nextDistanceKm: 0,
       nextStopIndex: -1
@@ -2356,6 +2484,7 @@ function calculateLiveJourneyProgress(route, stops) {
 
   return {
     currentStop: nearest.stop.stop_name || `Stop ${nearest.index + 1}`,
+    currentStopIndex: nearest.index,
     nextStop: next.stop.stop_name || `Stop ${next.index + 1}`,
     nextDistanceKm: distance(lat, lon, next.lat, next.lon),
     nextStopIndex: next.index
@@ -2386,15 +2515,91 @@ function renderJourneyTimeline(route, targetId) {
   const liveProgress = calculateLiveJourneyProgress(route, stops);
 
   const current = String(
-    liveProgress?.currentStop || bus.current_stop || route.current_stop || ""
+    route.current_stop || bus.current_stop || liveProgress?.currentStop || ""
   ).trim().toLowerCase();
 
   const next = String(
-    liveProgress?.nextStop || bus.next_stop || route.next_stop || ""
+    route.next_stop || bus.next_stop || liveProgress?.nextStop || ""
   ).trim().toLowerCase();
+
+  // Prefer the backend's actual live stop names over local GPS estimates.
+  const currentIndexFromApi = current
+    ? stops.findIndex(stop =>
+        String(stop.stop_name || "").trim().toLowerCase() === current
+      )
+    : -1;
+
+  const currentIndex = currentIndexFromApi >= 0
+    ? currentIndexFromApi
+    : Number.isInteger(liveProgress?.currentStopIndex)
+      ? liveProgress.currentStopIndex : -1;
+
+  // The next stop must occur after the current stop in route order.
+  const nextIndexFromApi = next
+    ? stops.findIndex((stop, index) =>
+        index > currentIndex &&
+        String(stop.stop_name || "").trim().toLowerCase() === next
+      )
+    : -1;
+
+  const nextIndex = nextIndexFromApi >= 0
+    ? nextIndexFromApi
+    : Number.isInteger(liveProgress?.nextStopIndex)
+      ? liveProgress.nextStopIndex : -1;
+
+  // Use real GPS coordinates to distinguish being at a stop from travelling
+  // between two stops.
+  const liveGps = route.liveLocation || {};
+  const gpsLat = Number(liveGps.latitude);
+  const gpsLon = Number(liveGps.longitude);
+  const gpsValid = Number.isFinite(gpsLat) && Number.isFinite(gpsLon) &&
+    gpsLat >= -90 && gpsLat <= 90 &&
+    gpsLon >= -180 && gpsLon <= 180 &&
+    !(gpsLat === 0 && gpsLon === 0);
+
+  const currentRow = stops[currentIndex];
+  const nextRow = stops[nextIndex];
+  const currentDisplay = currentRow?.stop_name || route.current_stop || "";
+  const nextDisplay = nextRow?.stop_name || route.next_stop || "";
+
+  const distanceToStopKm = (row) => {
+    if (!row || !gpsValid) return null;
+    const stopLat = Number(row.latitude ?? row.stop_latitude ?? row.lat);
+    const stopLon = Number(row.longitude ?? row.stop_longitude ?? row.lon);
+    if (!Number.isFinite(stopLat) || !Number.isFinite(stopLon) ||
+        stopLat < -90 || stopLat > 90 ||
+        stopLon < -180 || stopLon > 180) return null;
+
+    const rad = Math.PI / 180;
+    const dLat = (stopLat - gpsLat) * rad;
+    const dLon = (stopLon - gpsLon) * rad;
+    const h = Math.sin(dLat / 2) ** 2 +
+      Math.cos(gpsLat * rad) * Math.cos(stopLat * rad) *
+      Math.sin(dLon / 2) ** 2;
+    return 6371 * 2 * Math.asin(Math.sqrt(h));
+  };
+
+  const distanceFromCurrentKm = distanceToStopKm(currentRow);
+  const distanceToNextKm = distanceToStopKm(nextRow);
 
   const gpsOnline = route.gpsOnline === true ||
     route.gps_available === true;
+
+  const busBetweenStops = gpsOnline && gpsValid &&
+    currentIndex >= 0 && nextIndex > currentIndex &&
+    distanceFromCurrentKm !== null && distanceFromCurrentKm > 0.2 &&
+    distanceToNextKm !== null && distanceToNextKm > 0.2;
+
+  const gpsCoordinates = gpsValid
+    ? `${gpsLat.toFixed(5)}, ${gpsLon.toFixed(5)}`
+    : "";
+
+  const livePositionText = !gpsValid
+    ? "Waiting for live GPS"
+    : `${busBetweenStops
+        ? `Between ${currentDisplay || "previous stop"} and ${nextDisplay || "next stop"}`
+        : `At/near ${currentDisplay || "route stop"}`} · GPS ${gpsCoordinates}`;
+
 
   const gpsLabel = gpsOnline
     ? "Live GPS connected"
@@ -2411,10 +2616,13 @@ function renderJourneyTimeline(route, targetId) {
     if (["completed", "complete", "arrived", "reached"].includes(explicit)) {
       status = "completed";
       statusLabel = "Completed";
-    } else if (current && key === current) {
+    } else if (index === currentIndex && busBetweenStops) {
+      status = "completed";
+      statusLabel = "Passed";
+    } else if (index === currentIndex) {
       status = "current";
       statusLabel = "Bus is here";
-    } else if (next && key === next) {
+    } else if (index === nextIndex) {
       status = "next";
       statusLabel = "Next stop";
     } else if (["delayed", "late"].includes(explicit)) {
@@ -2425,8 +2633,26 @@ function renderJourneyTimeline(route, targetId) {
       statusLabel = "On time";
     }
 
-    // Fixed road distance from this stop to University Campus.
-    const distance = stop.distance_to_campus_km ?? null;
+    // Use stored campus distance when available; otherwise calculate
+    // straight-line distance from this stop to the final route stop.
+    const campusStop = stops[stops.length - 1];
+    const stopLat = Number(stop.latitude ?? stop.stop_latitude ?? stop.lat);
+    const stopLon = Number(stop.longitude ?? stop.stop_longitude ?? stop.lng ?? stop.lon);
+    const campusLat = Number(campusStop?.latitude ?? campusStop?.stop_latitude ?? campusStop?.lat);
+    const campusLon = Number(campusStop?.longitude ?? campusStop?.stop_longitude ?? campusStop?.lng ?? campusStop?.lon);
+
+    let distance = stop.distance_to_campus_km ?? null;
+
+    if ((distance === null || distance === "") &&
+        [stopLat, stopLon, campusLat, campusLon].every(Number.isFinite)) {
+      const rad = Math.PI / 180;
+      const dLat = (campusLat - stopLat) * rad;
+      const dLon = (campusLon - stopLon) * rad;
+      const a = Math.sin(dLat / 2) ** 2 +
+        Math.cos(stopLat * rad) * Math.cos(campusLat * rad) *
+        Math.sin(dLon / 2) ** 2;
+      distance = (6371 * 2 * Math.asin(Math.sqrt(a))).toFixed(2);
+    }
 
     const arrival = stop.actual_arrival_time ||
       stop.arrival_time ||
@@ -2447,7 +2673,7 @@ function renderJourneyTimeline(route, targetId) {
 
     const stopCode = stop.stop_code || stop.code || "";
 
-    return `
+    const stopHtml = `
       <article class="rail-stop rail-${status}">
         <div class="rail-distance">
           <strong>${distance !== null && distance !== ""
@@ -2490,15 +2716,51 @@ function renderJourneyTimeline(route, targetId) {
           ` : ""}
         </div>
       </article>`;
+
+    const liveLocationHtml =
+      busBetweenStops && index === currentIndex
+        ? `
+          <article class="rail-live-position">
+            <div class="rail-live-distance">
+              <strong>${distanceFromCurrentKm.toFixed(2)} km</strong>
+              <small>FROM LAST STOP</small>
+            </div>
+            <div class="rail-live-track">
+              <span class="rail-live-marker" aria-label="Live bus location">🚌</span>
+              <span class="rail-live-line"></span>
+            </div>
+            <div class="rail-live-content">
+              <div class="rail-live-title">
+                <strong>${esc(route.bus_number || bus.bus_number || "UNIVERSITY BUS")} · LIVE LOCATION</strong>
+                <span class="rail-live-badge">LIVE</span>
+              </div>
+              <div class="rail-live-description">
+                Between ${esc(currentDisplay || "previous stop")} and
+                ${esc(nextDisplay || "next stop")}
+              </div>
+              <div class="rail-live-next-distance">
+                ${distanceToNextKm.toFixed(2)} km to next stop
+              </div>
+            </div>
+          </article>`
+        : "";
+
+    return stopHtml + liveLocationHtml;
   }).join("");
 
   const destination = route.end_point || stops[stops.length - 1]?.stop_name || "Destination";
   const currentStop =
-    liveProgress?.currentStop || route.current_stop || bus.current_stop || "";
+    route.current_stop || bus.current_stop || liveProgress?.currentStop || "";
 
-  const nextStop = liveProgress
-    ? `${liveProgress.nextStop} · ${liveProgress.nextDistanceKm.toFixed(2)} km`
-    : route.next_stop || bus.next_stop || "";
+  const nextName =
+    route.next_stop || bus.next_stop || liveProgress?.nextStop || "";
+
+  const distanceMeters = Number(route.distance_to_next_stop_m);
+  const nextStop = nextName
+    ? `${nextName}${Number.isFinite(distanceMeters) && distanceMeters > 0
+        ? ` · ${(distanceMeters / 1000).toFixed(2)} km`
+        : liveProgress ? ` · ${liveProgress.nextDistanceKm.toFixed(2)} km` : ""}`
+    : "";
 
   target.innerHTML = `
     <div class="rail-journey">
@@ -2507,6 +2769,7 @@ function renderJourneyTimeline(route, targetId) {
           <span class="rail-eyebrow">LIVE BUS JOURNEY</span>
           <h3>${esc(route.bus_number || bus.bus_number || "University Bus")}</h3>
           <p>${esc(route.name || route.code || "University Route")}</p>
+          <p><strong>LIVE BUS LOCATION:</strong> ${esc(livePositionText)}</p>
         </div>
         <span class="rail-gps ${gpsOnline ? "is-live" : "is-waiting"}">
           ${esc(gpsLabel)}
@@ -2525,7 +2788,7 @@ function renderJourneyTimeline(route, targetId) {
 
       <div class="rail-journey-footer">
         <div>
-          <small>CURRENT STOP</small>
+          <small>${busBetweenStops ? "LAST PASSED STOP" : "CURRENT STOP"}</small>
           <strong>${esc(currentStop || "Awaiting GPS")}</strong>
         </div>
         <div>
@@ -2568,12 +2831,74 @@ const infoRow = (
   </div>`;
 
 
+
+function renderStudentLiveBusCard() {
+  const panel = $("studentLiveBusPanel");
+  if (!panel) return;
+
+  if (String(state.user?.role || "").toUpperCase() !== "STUDENT") {
+    panel.hidden = true;
+    return;
+  }
+  panel.hidden = false;
+
+  const route = state.activeRoute;
+  const bus = route?.busData || {};
+  const loc = route?.liveLocation || null;
+  const valid = loc &&
+    Number.isFinite(Number(loc.latitude)) &&
+    Number.isFinite(Number(loc.longitude)) &&
+    !(Number(loc.latitude) === 0 && Number(loc.longitude) === 0);
+
+  const online = valid && route.gpsOnline === true;
+  const status = online ? "GPS Online" : valid ? "GPS Stale" : "GPS Offline";
+
+  setText("studentBusStatus", status);
+  setText("studentBusCount", route ? "1 bus" : "0 buses");
+
+  const list = $("studentLiveBusDetails");
+  if (!list) return;
+  if (!route) {
+    list.innerHTML = '<div class="empty-state">No assigned bus found.</div>';
+    return;
+  }
+
+  const current = route.current_stop || bus.current_stop ||
+    $("trkCurrent")?.textContent?.trim() || "—";
+  const next = route.next_stop || bus.next_stop ||
+    $("trkNext")?.textContent?.trim() || "—";
+  const etaValue = route.eta_minutes ?? bus.eta_minutes;
+  const eta = etaValue != null
+    ? fmtEta(Number(etaValue))
+    : $("trkEta")?.textContent?.trim() || "—";
+  const speed = valid && loc.speed != null ? facultySpeed(loc.speed) : "—";
+  const updated = valid && loc.recorded_at ? facultyGpsAge(loc.recorded_at) : "No GPS update";
+  const busNo = bus.bus_number || route.bus_number || "Assigned bus";
+  const driver = bus.driver_id ? `Driver ID: ${esc(bus.driver_id)}` : "Driver details unavailable";
+
+  list.innerHTML = `<article class="faculty-fleet-card">
+    <div class="faculty-fleet-card-head">
+      <div><h4>${esc(busNo)}</h4>
+      <p>${esc(route.name || route.route_name || "University route")} · ${driver}</p></div>
+      <span class="status-badge ${online ? "success" : "warning"}">${status}</span>
+    </div>
+    <div class="faculty-fleet-metrics">
+      <div><span>Speed</span><strong>${esc(speed)}</strong></div>
+      <div><span>Current stop</span><strong>${esc(current)}</strong></div>
+      <div><span>Next stop</span><strong>${esc(next)}</strong></div>
+      <div><span>Estimated arrival</span><strong>${esc(eta)}</strong></div>
+      <div><span>Last GPS update</span><strong>${esc(updated)}</strong></div>
+    </div>
+  </article>`;
+}
+
 async function renderBusDetails() {
 
   const route =
     state.activeRoute;
 
   renderActiveJourneyTimelines();
+  renderStudentLiveBusCard();
 
 
   if (!route) {
@@ -2866,9 +3191,52 @@ function renderUniversityBuses() {
 }
 
 
+
+function applyRoleLabels() {
+  const faculty = String(state.user?.role || "").toUpperCase() === "FACULTY";
+
+  const set = (selector, value) => {
+    const el = document.querySelector(selector);
+    if (el) el.textContent = value;
+  };
+
+  set(".portal-label", faculty ? "Faculty portal" : "Student portal");
+  set("#dashboardSection .welcome-content .section-eyebrow",
+      faculty ? "Faculty dashboard" : "Student dashboard");
+  set("#dashboardSection .welcome-content p",
+      faculty
+        ? "Monitor university buses, active routes and live fleet locations."
+        : "Track your university buses, check routes and see when your bus will arrive.");
+
+  set('.menu-item[data-page="routes"] span',
+      faculty ? "All Routes" : "My Routes");
+  set(".routes-card .card-eyebrow",
+      faculty ? "University transport" : "Your transport");
+  set(".routes-card h3", faculty ? "All Routes" : "My Routes");
+  set("#routesSection .page-heading h2",
+      faculty ? "All Routes" : "My Routes");
+  set("#routesSection .page-heading p",
+      faculty
+        ? "View all active university routes and their assigned buses."
+        : "Routes subscribed to your student account.");
+
+  const stat = document.querySelector(
+    "#dashboardSection .stats-grid .stat-card:first-child .stat-content"
+  );
+
+  if (stat) {
+    const label = stat.querySelector("span");
+    const small = stat.querySelector("small");
+    if (label) label.textContent = faculty ? "University Routes" : "My Routes";
+    if (small) small.textContent = faculty ? "Active university routes" : "Subscribed routes";
+  }
+}
+
 /* ---------- Render everything ---------- */
 
 function renderAll() {
+
+  applyRoleLabels();
 
   renderUniversityBuses();
 
@@ -2955,9 +3323,14 @@ function showSection(
     );
 
 
+  const faculty = String(state.user?.role || "").toUpperCase() === "FACULTY";
+  const pageTitle = faculty && page === "routes"
+    ? "All Routes"
+    : PAGE_TITLES[page];
+
   setText(
     "pageTitle",
-    PAGE_TITLES[page]
+    pageTitle
   );
 
 
@@ -3842,9 +4215,17 @@ async function buildFacultyRoute(route) {
     busData: normalizedBus,
     stopsData,
     stops: stopsData.map(stop => stop.stop_name).filter(Boolean),
-    current_stop: null,
-    next_stop: null,
-    eta_minutes: null,
+    current_stop: liveBus?.current_stop || null,
+    next_stop: liveBus?.next_stop || null,
+    eta_minutes: liveBus?.eta_minutes ?? null,
+    distance_to_next_stop_m: liveBus?.distance_to_next_stop_m ?? null,
+    liveLocation: liveBus ? {
+      latitude: liveBus.latitude,
+      longitude: liveBus.longitude,
+      speed: liveBus.speed,
+      recorded_at: liveBus.recorded_at
+    } : null,
+    gpsOnline: liveBus?.gps_online === true,
     status: normalizedBus?.status || "inactive",
     gps_available: Boolean(liveBus?.gps_online),
     start_point: route.start_point || null,

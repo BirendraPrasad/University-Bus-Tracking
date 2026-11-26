@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from backend.app.dependencies import get_current_user
 from backend.app.database.connection import get_connection
+from backend.app.services.route_progress import get_route_progress
 
 
 router = APIRouter(
@@ -1025,23 +1026,49 @@ def get_route_bus_location(
                 WHERE trip_id = %s
                   AND bus_id = %s
                 ORDER BY recorded_at DESC, location_id DESC
-                LIMIT 1
+                LIMIT 2
             """, (trip_id, bus_id))
 
-            loc = cursor.fetchone()
+            gps_rows = cursor.fetchall()
+            loc = gps_rows[0] if gps_rows else None
+            calculated_speed = None
 
+            if loc and loc[2] is None and len(gps_rows) > 1:
+                previous = gps_rows[1]
+                if loc[3] and previous[3]:
+                    seconds = (loc[3] - previous[3]).total_seconds()
+                    if 0 < seconds <= 120:
+                        from backend.app.services.route_progress import _distance_m
+                        distance = _distance_m(
+                            loc[0], loc[1], previous[0], previous[1]
+                        )
+                        calculated_speed = distance / seconds
+
+            location = None if not loc else {
+                "latitude": float(loc[0]),
+                "longitude": float(loc[1]),
+                "speed": float(loc[2]) if loc[2] is not None else calculated_speed,
+                "recorded_at": (
+                    loc[3].replace(tzinfo=timezone.utc).isoformat()
+                    if loc[3] and loc[3].tzinfo is None else
+                    loc[3].astimezone(timezone.utc).isoformat()
+                    if loc and loc[3] else None
+                )
+            }
+            progress = get_route_progress(
+                cursor, trip_id, route_id,
+                location["latitude"] if location else None,
+                location["longitude"] if location else None,
+                location["speed"] if location else None
+            )
             return {
                 "route_id": route_id,
                 "trip_id": trip_id,
                 "bus_id": bus_id,
                 "bus_number": bus[0] if bus else None,
                 "trip_status": "ACTIVE",
-                "last_location": None if not loc else {
-                    "latitude": float(loc[0]),
-                    "longitude": float(loc[1]),
-                    "speed": float(loc[2]) if loc[2] is not None else None,
-                    "recorded_at": loc[3].replace(tzinfo=timezone.utc).isoformat()
-                }
+                "last_location": location,
+                **progress
             }
 
     finally:

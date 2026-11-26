@@ -242,3 +242,23 @@ PS C:\Users\asus> & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" rever
 UsbFfs tcp:8000 tcp:8000
 
 PS C:\Users\asus>
+
+
+
+
+
+
+
+
+
+==============================super set ==========================
+   Dashboard Embed UUID:-  (95ddec6d-af5a-4d19-ad3b-bc81ba7d236)
+
+
+=============================== .env ==============
+
+SUPERSET_URL=http://localhost:8088
+SUPERSET_USERNAME=bus_tracking_embed
+SUPERSET_PASSWORD=YOUR_SUPERSET_USER_PASSWORD
+
+

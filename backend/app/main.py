@@ -1,4 +1,5 @@
-﻿from backend.app.routers import notifications
+from backend.app.routers import superset
+from backend.app.routers import notifications
 from fastapi import FastAPI
 from backend.app.database.connection import get_connection
 from backend.app.routers.user import router as user_router
@@ -117,3 +118,4 @@ app.include_router(faculty_router)
 
 app.include_router(notifications.router)
 
+app.include_router(superset.router)

@@ -892,3 +892,173 @@ a{color:inherit;text-decoration:none}
   .split-schedule-header,.split-schedule-row{grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;padding:11px 9px;font-size:11px}
   .direction-count{font-size:10px}
 }
+
+
+/* Shared dashboard: Faculty live fleet */
+.faculty-fleet-panel { margin-top: 20px; }
+.faculty-fleet-heading {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 14px; margin-bottom: 16px;
+}
+.faculty-fleet-heading h3 { margin: 5px 0; color: var(--navy); }
+.faculty-fleet-heading p { margin: 0; color: var(--muted); font-size: 13px; }
+.faculty-fleet-grid {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px;
+}
+.faculty-fleet-card {
+  min-width: 0; padding: 15px; border: 1px solid var(--line);
+  border-radius: 12px; background: #fff;
+}
+.faculty-fleet-card-head {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 8px; flex-wrap: wrap;
+}
+.faculty-fleet-card p { margin: 7px 0 3px; color: var(--muted); font-size: 13px; }
+.faculty-fleet-card small { display: block; margin-top: 6px; color: var(--muted); }
+.faculty-fleet-metrics {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px; margin-top: 13px; padding: 12px;
+  border-radius: 10px; background: #f5f8fc;
+}
+.faculty-fleet-metrics div { min-width: 0; }
+.faculty-fleet-metrics span {
+  display: block; color: var(--muted); font-size: 11px; margin-bottom: 4px;
+}
+.faculty-fleet-metrics strong {
+  display: block; color: var(--navy); font-size: 13px; overflow-wrap: anywhere;
+}
+.faculty-fleet-popup { line-height: 1.7; min-width: 180px; }
+.faculty-fleet-popup strong { display: block; margin-bottom: 4px; }
+@media (max-width: 700px) {
+  .faculty-fleet-grid { grid-template-columns: 1fr; }
+}
+
+
+/* Live bus position between route stops */
+.rail-live-position {
+  display: grid;
+  grid-template-columns: 90px 28px minmax(0, 1fr);
+  min-height: 82px;
+  gap: 10px;
+}
+
+.rail-live-distance {
+  padding-top: 9px;
+  text-align: center;
+}
+
+.rail-live-distance strong {
+  display: block;
+  color: #2563eb;
+  font-size: 13px;
+}
+
+.rail-live-distance small {
+  display: block;
+  margin-top: 5px;
+  color: #64748b;
+  font-size: 9px;
+}
+
+.rail-live-track {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+
+.rail-live-marker {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 27px;
+  height: 27px;
+  margin-top: 5px;
+  border: 3px solid #ffffff;
+  border-radius: 50%;
+  background: #2563eb;
+  font-size: 14px;
+  box-shadow: 0 0 0 4px #bfdbfe;
+  animation: railBusPulse 1.5s ease-in-out infinite;
+}
+
+.rail-live-line {
+  position: absolute;
+  top: 34px;
+  bottom: -8px;
+  width: 5px;
+  border-radius: 5px;
+  background: repeating-linear-gradient(
+    to bottom,
+    #2563eb 0,
+    #2563eb 7px,
+    #93c5fd 7px,
+    #93c5fd 13px
+  );
+  background-size: 5px 26px;
+  animation: railSignalFlow 0.8s linear infinite;
+}
+
+.rail-live-content {
+  min-width: 0;
+  padding: 7px 0 17px;
+}
+
+.rail-live-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.rail-live-title strong {
+  color: #1d4ed8;
+  font-size: 12px;
+}
+
+.rail-live-badge {
+  padding: 3px 7px;
+  border-radius: 12px;
+  color: #15803d;
+  background: #dcfce7;
+  font-size: 9px;
+  font-weight: 800;
+  animation: railLiveBlink 1.2s ease-in-out infinite;
+}
+
+.rail-live-description,
+.rail-live-next-distance {
+  margin-top: 6px;
+  color: #475569;
+  font-size: 11px;
+}
+
+.rail-live-next-distance {
+  color: #1d4ed8;
+  font-weight: 700;
+}
+
+@keyframes railBusPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 3px #bfdbfe, 0 0 0 7px rgba(37, 99, 235, 0.10);
+  }
+  50% {
+    box-shadow: 0 0 0 5px #93c5fd, 0 0 0 12px rgba(37, 99, 235, 0.04);
+  }
+}
+
+@keyframes railSignalFlow {
+  to { background-position: 0 26px; }
+}
+
+@keyframes railLiveBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+@media (max-width: 600px) {
+  .rail-live-position {
+    grid-template-columns: 65px 24px minmax(0, 1fr);
+    gap: 7px;
+  }
+}

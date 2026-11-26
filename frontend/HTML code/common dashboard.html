@@ -234,6 +234,28 @@
       <div class="dashboard-card journey-card">
         <h3>Route & Live Journey</h3>
         <div id="trackingJourneyTimeline"></div>
+      <div class="dashboard-card faculty-fleet-panel" id="facultyFleetPanel" hidden>
+        <div class="faculty-fleet-heading">
+          <div><span class="card-eyebrow">Faculty overview</span>
+          <h3>Live University Fleet</h3>
+          <p id="facultyFleetStatus">Waiting for live bus locations...</p></div>
+          <span class="status-badge info" id="facultyFleetCount">0 buses</span>
+        </div>
+        <div class="faculty-fleet-grid" id="facultyFleetList">
+          <div class="empty-state">Loading active buses...</div>
+        </div>
+      </div>
+        <div class="dashboard-card faculty-fleet-panel student-live-bus-panel" id="studentLiveBusPanel" hidden>
+          <div class="faculty-fleet-heading">
+            <div><span class="card-eyebrow">Student live tracking</span>
+              <h3>My Assigned Bus</h3>
+              <p id="studentBusStatus">Waiting for GPS location...</p></div>
+            <span class="status-badge info" id="studentBusCount">1 bus</span>
+          </div>
+          <div class="faculty-fleet-grid" id="studentLiveBusDetails">
+            <div class="empty-state">Waiting for assigned bus details...</div>
+          </div>
+        </div>
       </div>
     </section>
 

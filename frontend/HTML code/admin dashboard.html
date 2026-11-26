@@ -15,6 +15,7 @@
   <script src="../JavaScript/admin-dashboard.js" defer></script>
   <script src="../JavaScript/admin-shell.js" defer></script>
 
+<script type="module" src="../JavaScript/superset-analytics.js"></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
@@ -25,7 +26,11 @@
         <span class="brand-mark"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4" y="3" width="16" height="15" rx="2"/><path d="M4 11h16M8 21v-3M16 21v-3"/><circle cx="8" cy="15" r=".6"/><circle cx="16" cy="15" r=".6"/></svg></span>
         <span class="brand-text"><strong>Bus Tracking</strong><span>Admin Console</span></span>
       </div>
-      <nav class="sidebar__nav" aria-label="Admin sections"><p class="nav-group-label" id="ng-operations">Operations</p><a class="nav-link" href="#overview" data-view="overview"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span>Overview</span></a><a class="nav-link" href="#live-map" data-view="live-map"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg><span>Live Map</span></a><p class="nav-group-label" id="ng-fleet">Fleet</p><a class="nav-link" href="#buses" data-view="buses"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4" y="3" width="16" height="15" rx="2"/><path d="M4 11h16M8 21v-3M16 21v-3"/><circle cx="8" cy="15" r=".6"/><circle cx="16" cy="15" r=".6"/></svg><span>Buses</span></a><a class="nav-link" href="#drivers" data-view="drivers"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg><span>Drivers</span></a><a class="nav-link" href="#routes" data-view="routes"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h6a4 4 0 0 0 0-8h-4a4 4 0 0 1 0-8h6"/></svg><span>Routes &amp; Stops</span></a><a class="nav-link" href="#schedules" data-view="schedules"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span>Schedules</span></a><a class="nav-link" href="#trips" data-view="trips"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span>Trips</span></a><p class="nav-group-label" id="ng-people">People</p><a class="nav-link" href="#users" data-view="users"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg><span>All Users</span></a><a class="nav-link" href="#students" data-view="students"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m2 9 10-5 10 5-10 5z"/><path d="M6 11.5V16c0 1.5 3 3 6 3s6-1.5 6-3v-4.5"/></svg><span>Students</span></a><a class="nav-link" href="#faculty" data-view="faculty"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-3.5 3-5.5 7-5.5s7 2 7 5.5M16 4.5a3.5 3.5 0 0 1 0 7M18 15c2.5.6 4 2.3 4 5"/></svg><span>Faculty</span></a><p class="nav-group-label" id="ng-data">Data</p><a class="nav-link" href="#import" data-view="import"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg><span>Bulk Import</span></a></nav>
+      <nav class="sidebar__nav" aria-label="Admin sections"><p class="nav-group-label" id="ng-operations">Operations</p><a class="nav-link" href="#overview" data-view="overview"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span>Overview</span></a><a class="nav-link" href="#live-map" data-view="live-map"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg><span>Live Map</span></a><p class="nav-group-label" id="ng-fleet">Fleet</p><a class="nav-link" href="#buses" data-view="buses"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4" y="3" width="16" height="15" rx="2"/><path d="M4 11h16M8 21v-3M16 21v-3"/><circle cx="8" cy="15" r=".6"/><circle cx="16" cy="15" r=".6"/></svg><span>Buses</span></a><a class="nav-link" href="#drivers" data-view="drivers"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg><span>Drivers</span></a><a class="nav-link" href="#routes" data-view="routes"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h6a4 4 0 0 0 0-8h-4a4 4 0 0 1 0-8h6"/></svg><span>Routes &amp; Stops</span></a><a class="nav-link" href="#schedules" data-view="schedules"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span>Schedules</span></a><a class="nav-link" href="#trips" data-view="trips"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span>Trips</span></a><p class="nav-group-label" id="ng-people">People</p><a class="nav-link" href="#users" data-view="users"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg><span>All Users</span></a><a class="nav-link" href="#students" data-view="students"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m2 9 10-5 10 5-10 5z"/><path d="M6 11.5V16c0 1.5 3 3 6 3s6-1.5 6-3v-4.5"/></svg><span>Students</span></a><a class="nav-link" href="#faculty" data-view="faculty"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-3.5 3-5.5 7-5.5s7 2 7 5.5M16 4.5a3.5 3.5 0 0 1 0 7M18 15c2.5.6 4 2.3 4 5"/></svg><span>Faculty</span></a><p class="nav-group-label" id="ng-data">Data</p><a class="nav-link" href="#import" data-view="import"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg><span>Bulk Import</span></a>
+<a class="nav-link" href="#superset" data-view="superset">
+  <span aria-hidden="true">📊</span><span>Superset Analytics</span>
+</a>
+</nav>
       <div class="sidebar__footer">University Bus Tracking System</div>
     </aside>
     <div class="sidebar-backdrop" id="sidebarBackdrop" hidden></div>
@@ -402,7 +407,28 @@
       <section class="card" style="margin-top:20px" aria-labelledby="prev-h"><div class="card__head"><h3 id="prev-h">Preview and validation results</h3></div>
         <div class="card__body"><div class="empty"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 13l3-8h12l3 8v6H3z"/><path d="M3 13h5l1 3h6l1-3h5"/></svg><strong>No file selected</strong><p>Valid and invalid row counts and row-by-row errors appear here after a file is validated.</p></div></div></section>
     </section>
-      </main>
+      
+<section class="view" id="view-superset"
+ data-title="Superset Analytics"
+ data-desc="University Bus Tracking fleet and GPS analytics." hidden>
+  <div class="page-head">
+    <div>
+      <h2>Superset Analytics</h2>
+      <p>Fleet, trips and GPS analytics</p>
+    </div>
+    <button class="btn" type="button"
+      onclick="document.getElementById('superset-status').textContent='Refreshing...'; location.hash='#superset-refresh'; location.hash='#superset';">
+      Refresh
+    </button>
+  </div>
+  <p id="superset-status" role="status" aria-live="polite">
+    Open Superset Analytics to connect.
+  </p>
+  <div id="superset-dashboard"
+       style="width:100%; min-height:700px; background:#fff; border-radius:12px; overflow:hidden;">
+  </div>
+</section>
+</main>
     </div>
   </div>
 
