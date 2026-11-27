@@ -22,6 +22,8 @@ document.addEventListener("DOMContentLoaded", function () {
     const form = document.getElementById("loginForm");
     const emailInput = document.getElementById("email");
     const passwordInput = document.getElementById("password");
+    const routeIdInput = document.getElementById("routeId");
+    const routeIdField = document.getElementById("routeIdField");
 
     const togglePassword =
         document.getElementById("togglePassword");
@@ -174,6 +176,12 @@ document.addEventListener("DOMContentLoaded", function () {
         const password =
             passwordInput.value;
 
+        const routeIdValue =
+            routeIdInput ? routeIdInput.value.trim() : "";
+
+        const routeId =
+            routeIdValue === "" ? null : Number(routeIdValue);
+
 
         // =========================
         // VALIDATION
@@ -197,6 +205,15 @@ document.addEventListener("DOMContentLoaded", function () {
                 "error"
             );
 
+            return;
+        }
+
+        if (routeIdField && !routeIdField.hidden && (!routeIdInput.value.trim() || Number(routeIdInput.value) < 1)) {
+            showMessage(
+                "Please enter your assigned Route ID.",
+                "error"
+            );
+            routeIdInput.focus();
             return;
         }
 
@@ -228,7 +245,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
                     body: JSON.stringify({
                         email: email,
-                        password: password
+                        password: password,
+                        route_id: routeId
                     })
                 }
             );
@@ -244,6 +262,26 @@ document.addEventListener("DOMContentLoaded", function () {
 
             if (!response.ok) {
 
+                if (
+                    response.status === 400 &&
+                    data.detail === "Route ID is required for driver login"
+                ) {
+                    if (routeIdField) {
+                        routeIdField.hidden = false;
+                    }
+                    showMessage(
+                        "Driver account detected. Please enter your assigned Route ID to continue.",
+                        "info"
+                    );
+
+                    // Reset button so the user can submit Route ID
+                    loginBtn.disabled = false;
+                    btnText.textContent = "Login";
+
+                    if (routeIdInput) routeIdInput.focus();
+                    return;
+                }
+
                 if (response.status === 401) {
 
                     throw new Error(
@@ -252,9 +290,8 @@ document.addEventListener("DOMContentLoaded", function () {
                 }
 
                 if (response.status === 403) {
-
                     throw new Error(
-                        "User account is inactive"
+                        data.detail || "User account is inactive"
                     );
                 }
 

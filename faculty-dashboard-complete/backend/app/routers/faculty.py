@@ -262,3 +262,10 @@ SUPERSET_USERNAME=bus_tracking_embed
 SUPERSET_PASSWORD=YOUR_SUPERSET_USER_PASSWORD
 
 
+
++++++++++++++++++++++++++++++++++++++    RUN         +============================
+
+Frontend:  http://127.0.0.1:5500
+Admin Dashboard: http://127.0.0.1:5500/HTML%20code/login.html
+Backend API: http://localhost:8000/docs
+Superset:http://localhost:8088/superset/welcome/

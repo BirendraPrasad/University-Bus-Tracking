@@ -1,8 +1,9 @@
 from backend.app.routers import superset
 from backend.app.routers import notifications
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from backend.app.database.connection import get_connection
 from backend.app.routers.user import router as user_router
+from backend.app.routers.bulk_import import router as bulk_import_router
 from backend.app.routers.auth import router as auth_router
 from backend.app.routers.student import router as student_router
 from backend.app.routers.driver import router as driver_router
@@ -14,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 
 import asyncio
+import os
 import logging
 from contextlib import asynccontextmanager
 from backend.app.services.gps_watchdog import complete_stale_gps_trips
@@ -68,6 +70,12 @@ app.mount(
 )
 
 # CORS Configuration
+frontend_origins = [
+    origin.strip()
+    for origin in os.getenv("FRONTEND_ORIGINS", "").split(",")
+    if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -75,12 +83,13 @@ app.add_middleware(
         "http://localhost:5500",
         "http://172.21.102.212:5500",
         "http://10.11.97.212:5500",
-        "https://appassets.androidplatform.net"
+        "https://appassets.androidplatform.net",
+        *frontend_origins,
     ],
     allow_origin_regex=r"^http://(10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2[0-9]|3[01])\.\d{1,3}\.\d{1,3}):5500$",
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 
@@ -101,11 +110,12 @@ def database_test():
             "message": "Database connection successful!"
         }
 
-    except Exception as e:
-        return {
-            "message": "Database connection failed!",
-            "error": str(e)
-        }
+    except Exception:
+        logger.exception("Database health check failed")
+        raise HTTPException(
+            status_code=503,
+            detail="Database temporarily unavailable"
+        )
 
 
 app.include_router(user_router)
@@ -119,3 +129,5 @@ app.include_router(faculty_router)
 app.include_router(notifications.router)
 
 app.include_router(superset.router)
+
+app.include_router(bulk_import_router)

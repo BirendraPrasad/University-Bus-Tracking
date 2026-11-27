@@ -271,6 +271,93 @@ def get_all_student_buses(current_user: dict = Depends(get_current_user)):
         conn.close()
 
 
+
+# Authenticated student: View live GPS status of the university fleet
+@router.get("/live-buses")
+def get_student_live_buses(current_user: dict = Depends(get_current_user)):
+    if current_user.get("role") != "STUDENT":
+        raise HTTPException(status_code=403, detail="Student access required")
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT DISTINCT ON (b.bus_id)
+                       t.trip_id, t.status, b.bus_id, b.bus_number,
+                       r.route_name, u.name AS driver_name,
+                       bl.latitude, bl.longitude, bl.speed, bl.recorded_at,
+                       (
+                           t.status = 'ACTIVE'
+                           AND bl.recorded_at >= (NOW() AT TIME ZONE 'UTC')
+                                                 - INTERVAL '60 seconds'
+                       ) AS gps_online,
+                       b.front_photo, b.side_photo, t.route_id
+                FROM routes r
+                JOIN trips t ON t.route_id = r.route_id
+                JOIN buses b ON b.bus_id = t.bus_id
+                LEFT JOIN drivers d ON d.driver_id = COALESCE(t.driver_id, b.driver_id)
+                LEFT JOIN users u ON u.user_id = d.user_id
+                LEFT JOIN LATERAL (
+                    SELECT latitude, longitude, speed, recorded_at
+                    FROM bus_locations
+                    WHERE trip_id = t.trip_id AND bus_id = b.bus_id
+                    ORDER BY recorded_at DESC
+                    LIMIT 1
+                ) bl ON TRUE
+                WHERE r.is_active = TRUE
+                ORDER BY b.bus_id,
+                         (t.status = 'ACTIVE') DESC,
+                         t.trip_date DESC NULLS LAST,
+                         t.trip_id DESC
+            """)
+
+            rows = cursor.fetchall()
+            live_buses = []
+
+            for r in rows:
+                latitude = float(r[6]) if r[6] is not None else None
+                longitude = float(r[7]) if r[7] is not None else None
+                speed = float(r[8]) if r[8] is not None else None
+
+                progress = get_route_progress(
+                    cursor, r[0], r[13], latitude, longitude, speed
+                ) if r[0] else {
+                    "current_stop": None, "next_stop": None,
+                    "distance_to_next_stop_m": None, "eta_minutes": None
+                }
+
+                recorded_at = r[9]
+                if recorded_at is not None and recorded_at.tzinfo is None:
+                    recorded_at = recorded_at.replace(
+                        tzinfo=__import__("datetime").timezone.utc
+                    )
+                elif recorded_at is not None:
+                    recorded_at = recorded_at.astimezone(
+                        __import__("datetime").timezone.utc
+                    )
+
+                live_buses.append({
+                    "trip_id": r[0],
+                    "trip_status": r[1],
+                    "bus_id": r[2],
+                    "bus_number": r[3],
+                    "route_name": r[4],
+                    "driver_name": r[5],
+                    "latitude": latitude,
+                    "longitude": longitude,
+                    "speed": speed,
+                    "recorded_at": recorded_at.isoformat() if recorded_at else None,
+                    "gps_online": bool(r[10]) if r[10] is not None else False,
+                    "front_photo": r[11],
+                    "side_photo": r[12],
+                    **progress
+                })
+
+            return live_buses
+    finally:
+        conn.close()
+
+
 # Logged-in student: View subscribed routes
 @router.get("/me/routes")
 def get_my_routes(current_user: dict = Depends(get_current_user)):

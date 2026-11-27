@@ -497,6 +497,11 @@ const STATUS = {
     cls: "muted"
   },
 
+  active: {
+    label: "Running",
+    cls: "ok"
+  },
+
   gps_offline: {
     label: "GPS Offline",
     cls: "warn"
@@ -578,7 +583,8 @@ const isRunning = (status) => {
 
   return (
     status === "on_time" ||
-    status === "delayed"
+    status === "delayed" ||
+    status === "active"
   );
 };
 
@@ -1432,6 +1438,24 @@ async function pollLiveLocation() {
       const response = await apiFetch("/faculty/live-buses");
       state.liveBuses = facultyList(response, ["live_buses", "buses"]);
 
+      // Sync every faculty dashboard route card with fresh fleet GPS data.
+      if (Array.isArray(state.routes)) {
+        state.routes.forEach(route => {
+          const busNumber = route.bus_number || route.busData?.bus_number;
+          if (!busNumber) return;
+
+          const liveBus = state.liveBuses.find(bus =>
+            String(bus.bus_number) === String(busNumber)
+          );
+
+          if (liveBus) {
+            route.gpsOnline = liveBus.gps_online === true;
+          }
+        });
+
+        renderDashRoutes();
+      }
+
       // Sync the selected faculty route with its live fleet GPS data.
       const activeRoute = state.activeRoute;
       if (activeRoute) {
@@ -1516,6 +1540,19 @@ async function pollLiveLocation() {
     return;
   }
 
+  // Student: refresh the complete university GPS fleet independently
+  // of the currently selected/subscribed route.
+  try {
+    const fleetResponse = await apiFetch("/students/live-buses");
+    state.liveBuses = facultyList(fleetResponse, ["live_buses", "buses"]);
+    setText(
+      "statActive",
+      state.liveBuses.filter(bus => bus.gps_online === true).length
+    );
+  } catch (fleetError) {
+    console.warn("Student fleet GPS refresh failed:", fleetError.message);
+  }
+
   const route = state.activeRoute;
   if (!route || !route.id) return;
 
@@ -1591,7 +1628,11 @@ function startLivePolling() {
   state.pollTimer = null;
 
   const role = String(state.user?.role || "").toUpperCase();
-  if (role !== "FACULTY" && (!state.activeRoute || !state.activeRoute.id)) {
+  if (
+    role !== "FACULTY" &&
+    role !== "STUDENT" &&
+    (!state.activeRoute || !state.activeRoute.id)
+  ) {
     return;
   }
 
@@ -1721,7 +1762,10 @@ function renderStats() {
     const buses = state.liveBuses || [];
 
     setText("statRoutes", state.routes.length);
-    setText("statActive", buses.length);
+    setText(
+      "statActive",
+      buses.filter(bus => bus.gps_online === true).length
+    );
     setText("statTrips", state.timetable.length);
 
     const upcoming = buses
@@ -1759,7 +1803,9 @@ function renderStats() {
     .sort((a, b) => a.eta_minutes - b.eta_minutes)[0];
 
   setText("statRoutes", state.routes.length);
-  setText("statActive", running.length);
+  const onlineBuses = (state.liveBuses || [])
+    .filter(bus => bus.gps_online === true);
+  setText("statActive", onlineBuses.length);
   setText("statTrips", state.timetable.length);
   setText("statNext", etas.length ? fmtEta(Math.min(...etas)) : "—");
   setText(
@@ -4196,8 +4242,9 @@ async function buildFacultyRoute(route) {
 
   const normalizedBus = busData ? {
     ...busData,
-    status: liveBus?.gps_online ? "active" :
-      (liveBus ? "inactive" : "scheduled")
+    status: liveBus?.trip_status === "ACTIVE" ? "active" :
+      (liveBus?.gps_online ? "active" :
+        (liveBus ? "inactive" : "scheduled"))
   } : null;
 
   return {
@@ -4355,6 +4402,15 @@ async function loadDashboardData() {
     } catch (error) {
       console.error("Student buses failed:", error.message);
       state.allBuses = [];
+    }
+
+    // Load the full live GPS fleet for the Student Active Buses count.
+    try {
+      const liveFleetData = await apiFetch("/students/live-buses");
+      state.liveBuses = facultyList(liveFleetData, ["live_buses", "buses"]);
+    } catch (error) {
+      console.error("Student live fleet failed:", error.message);
+      state.liveBuses = [];
     }
 
     let backendRoutes = [];

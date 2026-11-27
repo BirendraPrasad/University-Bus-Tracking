@@ -92,25 +92,25 @@
           
           
           <div>
-            <strong>Stage 5: API integration.</strong>Overview, Users, Buses, Drivers, Routes, Students and Faculty load live data from the backend API.Trips, Live Map and Bulk Import are still pending integration.
+            <strong>Stage 5: API integration.</strong>Admin modules are integrated with the backend APIs, including Users, Buses, Drivers, Routes, Students, Faculty, Trips and Live Fleet. Bulk Import is planned for a future update.
 
 
-            <div class="legend"><span class="chip chip--api">Connected</span><span class="chip chip--new">Pending: endpoint to add</span><span class="chip chip--ph">Pending: not connected</span></div>
+            <div class="legend"><span class="chip chip--api">Connected</span><span class="chip chip--api">API integrated</span><span class="chip chip--new">Planned feature</span></div>
           </div>
         </div>
         
     <section class="view" id="view-overview" data-title="Overview" data-desc="Operational summary of buses, people, routes and trips." hidden>
       <div class="page-head">
-        <div><h2>Overview</h2><p>Operational summary of buses, people, routes and trips.</p><div class="legend"><span class="chip chip--api">Counts: connected</span><span class="chip chip--new">Trips and GPS: pending</span></div></div>
+        <div><h2>Overview</h2><p>Operational summary of buses, people, routes and trips.</p><div class="legend"><span class="chip chip--api">Counts: connected</span><span class="chip chip--api">Trips and GPS: API integrated</span></div></div>
         <div class="page-actions"><span class="muted" id="lastRefreshed" aria-live="polite"></span><button class="btn" type="button" id="refreshBtn"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 11a8 8 0 0 0-14-4M4 4v4h4M4 13a8 8 0 0 0 14 4M20 20v-4h-4"/></svg>Refresh</button></div>
       </div>
-      <div class="kpi-grid" id="kpiGrid"><article class="card kpi" aria-label="Total buses"><div class="kpi__label"><span>Total buses</span><span class="chip chip--api">Connected</span></div><div class="kpi__value" data-kpi="buses">—</div><div class="kpi__note" data-kpi-note="buses">From GET /users/buses</div></article><article class="card kpi" aria-label="Total drivers"><div class="kpi__label"><span>Total drivers</span><span class="chip chip--api">Connected</span></div><div class="kpi__value" data-kpi="drivers">—</div><div class="kpi__note" data-kpi-note="drivers">From GET /users/drivers</div></article><article class="card kpi" aria-label="Total routes"><div class="kpi__label"><span>Total routes</span><span class="chip chip--api">Connected</span></div><div class="kpi__value" data-kpi="routes">—</div><div class="kpi__note" data-kpi-note="routes">From GET /users/routes</div></article><article class="card kpi" aria-label="Active routes"><div class="kpi__label"><span>Active routes</span><span class="chip chip--api">Connected</span></div><div class="kpi__value" data-kpi="active-routes">—</div><div class="kpi__note" data-kpi-note="active-routes">Routes with is_active = true</div></article><article class="card kpi" aria-label="Buses with a driver"><div class="kpi__label"><span>Buses with a driver</span><span class="chip chip--api">Connected</span></div><div class="kpi__value" data-kpi="buses-assigned">—</div><div class="kpi__note" data-kpi-note="buses-assigned">Buses where driver_id is set</div></article><article class="card kpi" aria-label="User accounts"><div class="kpi__label"><span>User accounts</span><span class="chip chip--api">Connected</span></div><div class="kpi__value" data-kpi="users">—</div><div class="kpi__note" data-kpi-note="users">From GET /users/</div></article><article class="card kpi" aria-label="Student accounts"><div class="kpi__label"><span>Student accounts</span><span class="chip chip--api">Connected</span></div><div class="kpi__value" data-kpi="students">—</div><div class="kpi__note" data-kpi-note="students">Users with role STUDENT</div></article><article class="card kpi" aria-label="Scheduled trips"><div class="kpi__label"><span>Scheduled trips</span><span class="chip chip--new">Pending</span></div><div class="kpi__value is-pending" aria-label="Pending">—</div><div class="kpi__note">Needs a trip list endpoint</div></article><article class="card kpi" aria-label="Active trips"><div class="kpi__label"><span>Active trips</span><span class="chip chip--new">Pending</span></div><div class="kpi__value is-pending" aria-label="Pending">—</div><div class="kpi__note">Needs a trip list endpoint</div></article><article class="card kpi" aria-label="Buses with recent GPS"><div class="kpi__label"><span>Buses with recent GPS</span><span class="chip chip--new">Pending</span></div><div class="kpi__value is-pending" aria-label="Pending">—</div><div class="kpi__note">Needs a latest-GPS endpoint</div></article></div>
+      <div class="kpi-grid" id="kpiGrid"><article class="card kpi" aria-label="Total buses"><div class="kpi__label"><span>Total buses</span><span class="chip chip--api">Connected</span></div><div class="kpi__value" data-kpi="buses">—</div><div class="kpi__note" data-kpi-note="buses">From GET /users/buses</div></article><article class="card kpi" aria-label="Total drivers"><div class="kpi__label"><span>Total drivers</span><span class="chip chip--api">Connected</span></div><div class="kpi__value" data-kpi="drivers">—</div><div class="kpi__note" data-kpi-note="drivers">From GET /users/drivers</div></article><article class="card kpi" aria-label="Total routes"><div class="kpi__label"><span>Total routes</span><span class="chip chip--api">Connected</span></div><div class="kpi__value" data-kpi="routes">—</div><div class="kpi__note" data-kpi-note="routes">From GET /users/routes</div></article><article class="card kpi" aria-label="Active routes"><div class="kpi__label"><span>Active routes</span><span class="chip chip--api">Connected</span></div><div class="kpi__value" data-kpi="active-routes">—</div><div class="kpi__note" data-kpi-note="active-routes">Routes with is_active = true</div></article><article class="card kpi" aria-label="Buses with a driver"><div class="kpi__label"><span>Buses with a driver</span><span class="chip chip--api">Connected</span></div><div class="kpi__value" data-kpi="buses-assigned">—</div><div class="kpi__note" data-kpi-note="buses-assigned">Buses where driver_id is set</div></article><article class="card kpi" aria-label="User accounts"><div class="kpi__label"><span>User accounts</span><span class="chip chip--api">Connected</span></div><div class="kpi__value" data-kpi="users">—</div><div class="kpi__note" data-kpi-note="users">From GET /users/</div></article><article class="card kpi" aria-label="Student accounts"><div class="kpi__label"><span>Student accounts</span><span class="chip chip--api">Connected</span></div><div class="kpi__value" data-kpi="students">—</div><div class="kpi__note" data-kpi-note="students">Users with role STUDENT</div></article><article class="card kpi" aria-label="Scheduled trips"><div class="kpi__label"><span>Scheduled trips</span><span class="chip chip--api">API integrated</span></div><div class="kpi__value" data-kpi="scheduled-trips">—</div><div class="kpi__note">Trip records from backend</div></article><article class="card kpi" aria-label="Active trips"><div class="kpi__label"><span>Active trips</span><span class="chip chip--api">API integrated</span></div><div class="kpi__value" data-kpi="active-trips">—</div><div class="kpi__note">Trip records from backend</div></article><article class="card kpi" aria-label="Buses with recent GPS"><div class="kpi__label"><span>Buses with recent GPS</span><span class="chip chip--new">Pending</span></div><div class="kpi__value is-pending" aria-label="Pending">—</div><div class="kpi__note">Needs a latest-GPS endpoint</div></article></div>
       <div class="grid-2">
-        <section class="card" aria-labelledby="recent-h"><div class="card__head"><h3 id="recent-h">Recent trips</h3><span class="chip chip--new">Endpoint to add</span></div>
+        <section class="card" aria-labelledby="recent-h"><div class="card__head"><h3 id="recent-h">Recent trips</h3><span class="chip chip--api">Backend integrated</span></div>
           <div class="table-wrap">
           <table class="data" id="tbl-recent" aria-label="Recent trips">
-            <thead><tr><th scope="col">Trip</th><th scope="col">Bus</th><th scope="col">Route</th><th scope="col">Driver</th><th scope="col">Date</th><th scope="col">Status</th></tr></thead>
-            <tbody><tr><td colspan="6"><div class="empty"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 13l3-8h12l3 8v6H3z"/><path d="M3 13h5l1 3h6l1-3h5"/></svg><strong>Pending: no endpoint yet</strong><p>This list needs a backend endpoint that does not exist yet. No data is shown and nothing is simulated.</p></div></td></tr></tbody>
+            <thead><tr><th scope="col">Daily Trip No.</th><th scope="col">Original Trip ID</th><th scope="col">Bus</th><th scope="col">Route</th><th scope="col">Driver</th><th scope="col">Date</th><th scope="col">Status</th></tr></thead>
+            <tbody><tr><td colspan="7"><div class="empty"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 13l3-8h12l3 8v6H3z"/><path d="M3 13h5l1 3h6l1-3h5"/></svg><strong>Loading records</strong><p>Trip records are retrieved from the backend API.</p></div></td></tr></tbody>
           </table>
         </div>
         <div class="pagination"><span>Showing 0 of 0</span>
@@ -119,14 +119,14 @@
         </section>
         <div class="stack">
           <section class="card" aria-labelledby="qa-h"><div class="card__head"><h3 id="qa-h">Quick actions</h3><span class="chip chip--ph">Opens form layouts</span></div><div class="card__body"><div class="quick-actions"><button class="btn" type="button" data-open-dialog="dlg-bus"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>Add bus</button><button class="btn" type="button" data-open-dialog="dlg-driver"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>Add driver</button><button class="btn" type="button" data-open-dialog="dlg-student"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>Add student</button><button class="btn" type="button" data-open-dialog="dlg-route"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>Add route</button><button class="btn" type="button" data-open-dialog="dlg-trip"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>Create trip</button></div></div></section>
-          <section class="card" aria-labelledby="gps-h"><div class="card__head"><h3 id="gps-h">GPS connectivity</h3><span class="chip chip--new">Endpoint to add</span></div>
-            <div class="card__body"><div class="empty" style="padding:12px 0"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 21s7-6.2 7-11a7 7 0 0 0-14 0c0 4.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg><strong>No GPS status loaded</strong><p>Freshness (Live, Stale, Offline) will be calculated from real <code>bus_locations</code> timestamps. No status is shown until then.</p></div></div></section>
+          <section class="card" aria-labelledby="gps-h"><div class="card__head"><h3 id="gps-h">GPS connectivity</h3><span class="chip chip--api">Backend integrated</span></div>
+            <div class="card__body"><div class="empty" style="padding:12px 0"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 21s7-6.2 7-11a7 7 0 0 0-14 0c0 4.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg><strong>GPS monitoring</strong><p>GPS updates are processed through the driver API and Kafka. Live fleet information is retrieved from the backend.</p></div></div></section>
         </div>
       </div>
     </section>
     <section class="view" id="view-live-map" data-title="Live Map" data-desc="Latest authorised GPS position of each bus with a freshness indicator." hidden>
       <div class="page-head">
-        <div><h2>Live Map</h2><p>Latest authorised GPS position of each bus with a freshness indicator.</p><div class="legend"><span class="chip chip--new">Endpoint to add</span><span class="chip chip--ph">Map not loaded</span></div></div>
+        <div><h2>Live Map</h2><p>Latest authorised GPS position of each bus with a freshness indicator.</p><div class="legend"><span class="chip chip--api">Live fleet API integrated</span></div></div>
         <div class="page-actions"></div>
       </div>
       <section class="card" id="gps-simulator-panel" aria-labelledby="gps-sim-heading">
@@ -160,9 +160,9 @@
         </div>
       </section>
 
-      <div class="pending-note" role="note"><strong>Pending.</strong> The live map and GPS freshness need a latest-location endpoint and are not built yet. No bus positions are shown.</div>
+      <div class="pending-note" role="note"><strong>Live fleet integration.</strong> The dashboard retrieves bus positions from the live fleet API. Actual map data depends on available GPS updates.</div>
       <div class="map-layout">
-        <section class="card" aria-labelledby="map-h"><div class="card__head"><h3 id="map-h">Fleet map</h3><span class="chip chip--ph">Pending: map not connected</span></div>
+        <section class="card" aria-labelledby="map-h"><div class="card__head"><h3 id="map-h">Fleet map</h3><span class="chip chip--api">Map integration</span></div>
           <div id="fleet-map" style="height:520px;width:100%;border-radius:12px;z-index:1"></div></section>
         <div class="stack">
           <section class="card" aria-labelledby="fr-h"><div class="card__head"><h3 id="fr-h">GPS freshness rules</h3></div><div class="card__body">
@@ -186,6 +186,7 @@
                 <dt>Driver</dt><dd id="fleet-detail-driver">—</dd>
                 <dt>Trip</dt><dd id="fleet-detail-trip">—</dd>
                 <dt>GPS source</dt><dd id="fleet-detail-source">—</dd>
+                <dt>Last Known Location</dt><dd id="fleet-detail-location">Select a bus</dd>
                 <dt>Latitude</dt><dd id="fleet-detail-lat">—</dd>
                 <dt>Longitude</dt><dd id="fleet-detail-lng">—</dd>
                 <dt>Speed</dt><dd id="fleet-detail-speed">—</dd>
@@ -328,16 +329,28 @@
     </section>
     <section class="view" id="view-trips" data-title="Trips" data-desc="Scheduled, active, completed and cancelled trips." hidden>
       <div class="page-head">
-        <div><h2>Trips</h2><p>Scheduled, active, completed and cancelled trips.</p><div class="legend"><span class="chip chip--api">Create: API exists, not connected yet</span><span class="chip chip--api">List and filters: connected</span></div></div>
+        <div><h2>Trips</h2><p>Scheduled, active, completed and cancelled trips.</p><div class="legend"><span class="chip chip--api">Create API integrated</span><span class="chip chip--api">List and filters: connected</span></div></div>
         <div class="page-actions"><button class="btn btn--primary" type="button" data-open-dialog="dlg-trip"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>Create trip</button></div>
       </div>
       <div class="pending-note" role="status">  <strong>Connected.</strong>  Trip records are loading from the backend API.</div>
-      <section class="card"><div class="toolbar" role="search"><div class="field field--search"><label for="trip-search">Search</label><input class="input" id="trip-search" type="search" placeholder="Trip ID, bus or route"></div><div class="field"><label for="trip-status">Status</label><select class="select" id="trip-status"><option value="">All statuses</option><option>SCHEDULED</option><option>ACTIVE</option><option>COMPLETED</option><option>CANCELLED</option></select></div></div>
+      <section class="card">
+        <div class="kpi-grid" id="tripHistoryStats">
+          <article class="card kpi"><div class="kpi__label">Total Trips</div><div class="kpi__value" id="adminTripTotal">—</div></article>
+          <article class="card kpi"><div class="kpi__label">Completed</div><div class="kpi__value" id="adminTripCompleted">—</div></article>
+          <article class="card kpi"><div class="kpi__label">Active</div><div class="kpi__value" id="adminTripActive">—</div></article>
+          <article class="card kpi"><div class="kpi__label">Cancelled</div><div class="kpi__value" id="adminTripCancelled">—</div></article>
+        </div>
+        <div class="toolbar" role="search">
+          <div class="field field--search"><label for="trip-search">Search</label><input class="input" id="trip-search" type="search" placeholder="Trip ID, bus, route or driver"></div>
+          <div class="field"><label for="trip-status">Status</label><select class="select" id="trip-status"><option value="">All statuses</option><option>SCHEDULED</option><option>ACTIVE</option><option>COMPLETED</option><option>CANCELLED</option></select></div>
+          <div class="field"><label for="trip-bus-filter">Bus-wise History</label><select class="select" id="trip-bus-filter"><option value="">All buses</option></select></div>
+          <div class="field"><label for="trip-driver-filter">Driver-wise History</label><select class="select" id="trip-driver-filter"><option value="">All drivers</option></select></div>
+        </div>
         <div class="toolbar" style="border-top:0"><div class="field"><label for="trip-date">Trip date</label><input class="input" id="trip-date" type="date"></div></div>
         <div class="table-wrap">
           <table class="data" id="tbl-trips" aria-label="Trips">
-            <thead><tr><th scope="col">Trip</th><th scope="col">Bus</th><th scope="col">Route</th><th scope="col">Driver</th><th scope="col">Date</th><th scope="col">Status</th></tr></thead>
-            <tbody><tr><td colspan="6"><div class="empty"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 13l3-8h12l3 8v6H3z"/><path d="M3 13h5l1 3h6l1-3h5"/></svg><strong>Pending: no endpoint yet</strong><p>This list needs a backend endpoint that does not exist yet. No data is shown and nothing is simulated.</p></div></td></tr></tbody>
+            <thead><tr><th scope="col">Daily Trip No.</th><th scope="col">Original Trip ID</th><th scope="col">Bus</th><th scope="col">Route</th><th scope="col">Driver</th><th scope="col">Date</th><th scope="col">Status</th></tr></thead>
+            <tbody><tr><td colspan="6"><div class="empty"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 13l3-8h12l3 8v6H3z"/><path d="M3 13h5l1 3h6l1-3h5"/></svg><strong>Loading records</strong><p>Trip records are retrieved from the backend API.</p></div></td></tr></tbody>
           </table>
         </div>
         <div class="pagination"><span>Showing 0 of 0</span>
@@ -346,7 +359,7 @@
     </section>
     <section class="view" id="view-users" data-title="All Users" data-desc="Every account in the system, from the existing users table." hidden>
       <div class="page-head">
-        <div><h2>All Users</h2><p>Every account in the system, from the existing users table.</p><div class="legend"><span class="chip chip--api">Connected: GET /users/</span><span class="chip chip--new">Create and edit: pending</span></div></div>
+        <div><h2>All Users</h2><p>Every account in the system, from the existing users table.</p><div class="legend"><span class="chip chip--api">Connected: GET /users/</span><span class="chip chip--api">User management APIs available</span></div></div>
         <div class="page-actions"></div>
       </div>
       <section class="card"><div class="toolbar" role="search"><div class="field field--search"><label for="usr-search">Search</label><input class="input" id="usr-search" type="search" placeholder="Name or email"></div><div class="field"><label for="usr-role">Role</label><select class="select" id="usr-role"><option value="">All roles</option><option>ADMIN</option><option>DRIVER</option><option>FACULTY</option><option>STUDENT</option></select></div></div>
@@ -355,7 +368,7 @@
     </section>
     <section class="view" id="view-students" data-title="Students" data-desc="Student accounts and profiles." hidden>
       <div class="page-head">
-        <div><h2>Students</h2><p>Student accounts and profiles.</p><div class="legend"><span class="chip chip--new">List: to add</span><span class="chip chip--api">Create: API exists, not connected yet</span></div></div>
+        <div><h2>Students</h2><p>Student accounts and profiles.</p><div class="legend"><span class="chip chip--api">List API integrated</span><span class="chip chip--api">Create API integrated</span></div></div>
         <div class="page-actions"><button class="btn btn--primary" type="button" data-open-dialog="dlg-student"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>Add student</button></div>
       </div>
       <div class="pending-note" role="note">
@@ -367,7 +380,7 @@
         <div class="table-wrap">
           <table class="data" id="tbl-students" aria-label="Students">
             <thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Enrolment no.</th><th scope="col">Department</th><th scope="col">Semester</th><th scope="col">Status</th></tr></thead>
-            <tbody><tr><td colspan="6"><div class="empty"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 13l3-8h12l3 8v6H3z"/><path d="M3 13h5l1 3h6l1-3h5"/></svg><strong>Pending: no endpoint yet</strong><p>This list needs a backend endpoint that does not exist yet. No data is shown and nothing is simulated.</p></div></td></tr></tbody>
+            <tbody><tr><td colspan="6"><div class="empty"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 13l3-8h12l3 8v6H3z"/><path d="M3 13h5l1 3h6l1-3h5"/></svg><strong>Loading records</strong><p>Trip records are retrieved from the backend API.</p></div></td></tr></tbody>
           </table>
         </div>
         <div class="pagination"><span>Showing 0 of 0</span>
@@ -376,38 +389,84 @@
     </section>
     <section class="view" id="view-faculty" data-title="Faculty" data-desc="Faculty accounts and profiles." hidden>
       <div class="page-head">
-        <div><h2>Faculty</h2><p>Faculty accounts and profiles.</p><div class="legend"><span class="chip chip--new">List: to add</span><span class="chip chip--api">Create: API exists, not connected yet</span></div></div>
+        <div><h2>Faculty</h2><p>Faculty accounts and profiles.</p><div class="legend"><span class="chip chip--api">List API integrated</span><span class="chip chip--api">Create API integrated</span></div></div>
         <div class="page-actions"><button class="btn btn--primary" type="button" data-open-dialog="dlg-faculty"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>Add faculty</button></div>
       </div>
-      <div class="pending-note" role="note"><strong>Pending.</strong> There is no faculty list endpoint yet. Faculty accounts can be seen in All Users. Faculty profile details are pending.</div>
+      <div class="pending-note" role="note"><strong>Faculty management integrated.</strong> Faculty records and profile information are retrieved through the backend APIs.</div>
       <section class="card"><div class="toolbar" role="search"><div class="field field--search"><label for="fac-search">Search</label><input class="input" id="fac-search" type="search" placeholder="Name, email or employee ID"></div><div class="field"><label for="fac-dept">Department</label><select class="select" id="fac-dept"><option value="">All departments</option></select></div></div>
         <div class="table-wrap">
           <table class="data" id="tbl-faculty" aria-label="Faculty">
             <thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Employee ID</th><th scope="col">Department</th><th scope="col">Status</th></tr></thead>
-            <tbody><tr><td colspan="5"><div class="empty"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 13l3-8h12l3 8v6H3z"/><path d="M3 13h5l1 3h6l1-3h5"/></svg><strong>Pending: no endpoint yet</strong><p>This list needs a backend endpoint that does not exist yet. No data is shown and nothing is simulated.</p></div></td></tr></tbody>
+            <tbody><tr><td colspan="5"><div class="empty"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 13l3-8h12l3 8v6H3z"/><path d="M3 13h5l1 3h6l1-3h5"/></svg><strong>Loading records</strong><p>Trip records are retrieved from the backend API.</p></div></td></tr></tbody>
           </table>
         </div>
         <div class="pagination"><span>Showing 0 of 0</span>
           <div class="pagination__controls"><button class="btn btn--sm" type="button" disabled>Previous</button><button class="btn btn--sm" type="button" disabled>Next</button></div>
         </div></section>
     </section>
-    <section class="view" id="view-import" data-title="Bulk Import" data-desc="Import buses, drivers, students, routes and stops from CSV or Excel." hidden>
-      <div class="page-head">
-        <div><h2>Bulk Import</h2><p>Import buses, drivers, students, routes and stops from CSV or Excel.</p><div class="legend"><span class="chip chip--new">Backend import endpoints: to add</span><span class="chip chip--ph">Nothing is uploaded from this page yet</span></div></div>
-        <div class="page-actions"></div>
+    <section class="view" id="view-import" data-title="Bulk Import" data-desc="Import records using CSV files." hidden>
+  <div class="page-head">
+    <div>
+      <h2>Bulk Import</h2>
+      <p>Import students, drivers, faculty, buses, routes and stops using CSV.</p>
+      <div class="legend"><span class="chip chip--new">CSV Import</span></div>
+    </div>
+  </div>
+  <section class="card" aria-labelledby="imp-h">
+    <div class="card__head"><h3 id="imp-h">Import workflow</h3></div>
+    <div class="card__body">
+      <ol class="steps">
+        <li>Select data type and download template</li>
+        <li>Fill and upload CSV</li>
+        <li>Review validation results</li>
+        <li>Confirm import when all rows are valid</li>
+      </ol>
+      <div class="form-grid">
+        <div class="field">
+          <label for="imp-type">Data type *</label>
+          <select class="select" id="imp-type" required>
+            <option value="">Select a data type</option>
+            <option value="students">Students</option>
+            <option value="drivers">Drivers</option>
+            <option value="faculty">Faculty</option>
+            <option value="buses">Buses</option>
+            <option value="routes">Routes</option>
+            <option value="stops">Stops</option>
+          </select>
+        </div>
+        <div class="field">
+          <span class="label">Template</span>
+          <button class="btn" id="imp-template" type="button">Download CSV template</button>
+        </div>
+        <div class="field span-2">
+          <label for="imp-file">Upload CSV *</label>
+          <div class="dropzone">
+            <input id="imp-file" type="file" accept=".csv,text/csv">
+            <span>CSV only · Maximum 5 MB · Maximum 1000 rows</span>
+          </div>
+        </div>
       </div>
-      <div class="pending-note" role="note"><strong>Pending.</strong> Bulk import needs backend upload endpoints that do not exist yet. Nothing can be uploaded from this page.</div>
-      <section class="card" aria-labelledby="imp-h"><div class="card__head"><h3 id="imp-h">Import workflow</h3></div><div class="card__body">
-        <ol class="steps"><li>Choose data type and download the template</li><li>Upload a CSV or Excel file</li><li>Preview rows; review valid and invalid counts</li><li>Confirm. All rows import in one transaction, or none.</li></ol>
-        <div class="form-grid">
-          <div class="field"><label for="imp-type">Data type <span class="req" aria-hidden="true">*</span></label><select class="select" id="imp-type" name="imp-type" required aria-describedby="imp-type-hint"><option value="">Select a data type</option><option value="buses">Buses</option><option value="drivers">Drivers</option><option value="students">Students</option><option value="routes">Routes</option><option value="stops">Stops</option></select><span class="hint" id="imp-type-hint">Templates are pending.</span></div>
-          <div class="field"><span class="label">Template</span><button class="btn" type="button" disabled>Download template</button></div>
-          <div class="field span-2"><label for="imp-file">File</label><div class="dropzone"><input id="imp-file" type="file" accept=".csv,.xlsx,.xls" disabled><span>CSV or Excel. File type and size are validated on the server.</span></div></div>
-        </div></div></section>
-      <section class="card" style="margin-top:20px" aria-labelledby="prev-h"><div class="card__head"><h3 id="prev-h">Preview and validation results</h3></div>
-        <div class="card__body"><div class="empty"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 13l3-8h12l3 8v6H3z"/><path d="M3 13h5l1 3h6l1-3h5"/></svg><strong>No file selected</strong><p>Valid and invalid row counts and row-by-row errors appear here after a file is validated.</p></div></div></section>
-    </section>
-      
+      <div class="page-actions" style="margin-top:16px">
+        <button class="btn btn--primary" id="imp-preview" type="button">Validate & Preview</button>
+        <button class="btn btn--primary" id="imp-confirm" type="button" disabled>Confirm Import</button>
+      </div>
+      <p id="imp-status" role="status" aria-live="polite"></p>
+    </div>
+  </section>
+  <section class="card" style="margin-top:20px" aria-labelledby="prev-h">
+    <div class="card__head"><h3 id="prev-h">Preview and validation results</h3></div>
+    <div class="card__body">
+      <div id="imp-summary">No file validated yet.</div>
+      <div style="overflow-x:auto;margin-top:12px">
+        <table class="data-table" id="imp-results">
+          <thead><tr><th>Row</th><th>Status</th><th>Error</th><th>Data</th></tr></thead>
+          <tbody><tr><td colspan="4">No preview available.</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</section>
+
 <section class="view" id="view-superset"
  data-title="Superset Analytics"
  data-desc="University Bus Tracking fleet and GPS analytics." hidden>

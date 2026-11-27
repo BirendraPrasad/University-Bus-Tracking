@@ -9,6 +9,7 @@ const LOGIN_PAGE = "login.html";
 // Must match the key(s) your login page writes the JWT to.
 const TOKEN_KEYS = ["token", "access_token", "accessToken", "jwt"];
 const GPS_SEND_INTERVAL_MS = 5000;
+let gpsPollTimer = null;
 const GPS_RESUME_KEY = "driver_gps_sharing_requested";
 function gpsResumeStorageKey() { return `${GPS_RESUME_KEY}:${state.profile?.driver_id ?? "unknown"}`; }
 
@@ -403,20 +404,50 @@ function renderGps() {
   $("startGpsBtn").disabled = running || !state.profile?.bus; $("stopGpsBtn").disabled = !running;
   renderDashboard();
 }
+function renderTripStats() {
+  const history = state.history;
+  if (!Array.isArray(history)) {
+    setText("cTodayTrips", "—");
+    setText("cTotalTrips", "—");
+    return;
+  }
+
+  const actualTrips = history.filter(t =>
+    ["ACTIVE", "COMPLETED"].includes(String(t.status || "").toUpperCase())
+  );
+
+  const now = new Date();
+  const today = [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getDate()).padStart(2, "0")
+  ].join("-");
+
+  const todayCount = actualTrips.filter(t =>
+    String(t.trip_date || "").slice(0, 10) === today
+  ).length;
+
+  setText("cTodayTrips", todayCount);
+  setText("cTotalTrips", actualTrips.length);
+}
+
 function renderHistory() {
   const body = $("historyBody"), empty = $("historyEmpty"), h = state.history;
+
   if (state.loadingTrips && !h) {
     body.innerHTML = "";
     empty.hidden = false;
     empty.textContent = "Loading trip history…";
     return;
   }
+
   if (!h) {
     body.innerHTML = "";
     empty.hidden = false;
     empty.textContent = state.historyError ? state.historyError.message : "No trip history.";
     return;
   }
+
   if (!h.length) {
     body.innerHTML = "";
     empty.hidden = false;
@@ -426,29 +457,49 @@ function renderHistory() {
 
   empty.hidden = true;
   const grouped = {};
+
   h.forEach(t => {
-    const date = t.trip_date || "Unknown date";
+    const date = String(t.trip_date || "Unknown date").slice(0, 10);
     if (!grouped[date]) grouped[date] = [];
     grouped[date].push(t);
   });
 
-  body.innerHTML = Object.entries(grouped).map(([date, trips]) => {
-    const completed = trips.filter(t => String(t.status).toUpperCase() === "COMPLETED").length;
-    const active = trips.filter(t => String(t.status).toUpperCase() === "ACTIVE").length;
-    const rows = trips.map(t => `<tr>
-      <td>#${esc(t.trip_id)}</td>
-      <td>${esc(dash(t.trip_date))}</td>
-      <td>${esc(dash(t.bus.bus_number))}</td>
-      <td>${esc(dash(t.route.route_code))}</td>
-      <td>${esc(fmtTime(t.start_time))}</td>
-      <td>${esc(fmtTime(t.end_time))}</td>
-      <td>${statusBadge(t.status)}</td>
-    </tr>`).join("");
+  body.innerHTML = Object.entries(grouped)
+    .sort(([a], [b]) => b.localeCompare(a))
+    .map(([date, trips]) => {
+      // Assign serial numbers in creation order, restarting for each date.
+      trips.sort((a, b) => Number(a.trip_id) - Number(b.trip_id));
 
-    return `<tr><td colspan="7" style="font-weight:700;background:var(--surface-2,#eef2f7);padding:12px">
-      ${esc(date)} — Total: ${trips.length} | Completed: ${completed} | Active: ${active}
-    </td></tr>${rows}`;
-  }).join("");
+      let dailySerial = 0;
+      const numberedTrips = trips.map(t => {
+        const actual = ["ACTIVE", "COMPLETED"].includes(
+          String(t.status || "").toUpperCase()
+        );
+        if (actual) dailySerial++;
+        return { ...t, dailySerial: actual ? dailySerial : null };
+      });
+
+      const completed = trips.filter(t =>
+        String(t.status).toUpperCase() === "COMPLETED"
+      ).length;
+      const active = trips.filter(t =>
+        String(t.status).toUpperCase() === "ACTIVE"
+      ).length;
+
+      const rows = numberedTrips.map(t => `<tr>
+        <td>${t.dailySerial ? `Trip ${String(t.dailySerial).padStart(2, "0")}` : "—"}</td>
+        <td>${esc(dash(t.trip_date))}</td>
+        <td>${esc(dash(t.bus.bus_number))}</td>
+        <td>${esc(dash(t.route.route_code))}</td>
+        <td>${esc(fmtTime(t.start_time))}</td>
+        <td>${esc(fmtTime(t.end_time))}</td>
+        <td>${statusBadge(t.status)}</td>
+      </tr>`).join("");
+
+      return `<tr><td colspan="7" style="font-weight:700;background:var(--surface-2,#eef2f7);padding:12px">
+        ${esc(date)} — Total: ${completed + active} | Completed: ${completed} | Active: ${active}
+      </td></tr>${rows}`;
+    }).join("");
 }
 function renderNotifications() {
   const n = state.notifs;
@@ -469,7 +520,7 @@ function renderProfile() {
     row("License number", p.license_number) + row("Phone number", p.phone) + row("Assigned bus", bus ? bus.bus_number : null);
   $("setInfo").innerHTML = row("Name", p.name) + row("Email", p.email) + row("Role", p.role) + row("Account active", p.is_active === undefined ? null : (p.is_active ? "Yes" : "No"));
 }
-function renderAll() { renderHeader(); renderDashboard(); renderBus(); renderRoute(); renderTrips(); renderTrip(); renderGps(); renderHistory(); renderNotifications(); renderProfile(); }
+function renderAll() { renderHeader(); renderDashboard(); renderBus(); renderRoute(); renderTrips(); renderTrip(); renderGps(); renderTripStats(); renderHistory(); renderNotifications(); renderProfile(); }
 
 /* ---------- maps (Leaflet + OpenStreetMap) ---------- */
 const MAP_TARGETS = { dash: ["dashMap", "dashMapNote", "dashMapLabel"], route: ["routeMap", "routeMapNote", null] };
@@ -554,9 +605,24 @@ function startGps() {
   localStorage.setItem(gpsResumeStorageKey(), "true");
   setMsg("gpsNote", "Waiting for location permission…", "");
   state.gps.status = "requesting"; state.gps.tripId = null; renderGps();
-  state.gps.watchId = navigator.geolocation.watchPosition(onGpsSuccess, onGpsError, { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 });
+  state.gps.watchId = navigator.geolocation.watchPosition(onGpsSuccess, onGpsError, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
+
+  // Request a fresh GPS reading every 5 seconds, even when the bus is stationary.
+  if (gpsPollTimer !== null) clearInterval(gpsPollTimer);
+  gpsPollTimer = setInterval(() => {
+    if (state.gps.watchId === null) return;
+    navigator.geolocation.getCurrentPosition(
+      onGpsSuccess,
+      onGpsError,
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
+    );
+  }, GPS_SEND_INTERVAL_MS);
 }
 function stopGps(silent, preservePreference = false) {
+  if (gpsPollTimer !== null) {
+    clearInterval(gpsPollTimer);
+    gpsPollTimer = null;
+  }
   if (state.gps.watchId !== null && "geolocation" in navigator) navigator.geolocation.clearWatch(state.gps.watchId);
   state.gps.watchId = null; state.gps.tripId = null; state.gps.status = "not_started";
   if (!preservePreference) localStorage.removeItem(gpsResumeStorageKey());
@@ -571,9 +637,27 @@ function onGpsSuccess(pos) {
   }
 }
 function onGpsError(err) {
-  state.gps.status = err.code === 1 ? "denied" : "error";
-  setMsg("gpsNote", err.code === 1 ? "Location permission was denied. Allow location access in your browser settings and try again." : "Could not read your location. Check that GPS is turned on.", "error");
-  if (state.gps.watchId !== null) { navigator.geolocation.clearWatch(state.gps.watchId); state.gps.watchId = null; }
+  const g = state.gps;
+
+  if (err.code === 1) {
+    // Permission denied: stop sharing until the driver enables permission.
+    g.status = "denied";
+    if (g.watchId !== null) navigator.geolocation.clearWatch(g.watchId);
+    g.watchId = null;
+
+    if (gpsPollTimer !== null) {
+      clearInterval(gpsPollTimer);
+      gpsPollTimer = null;
+    }
+
+    localStorage.removeItem(gpsResumeStorageKey());
+    setMsg("gpsNote", "Location permission denied. Allow browser location permission and start GPS again.", "error");
+  } else {
+    // Temporary GPS unavailable/timeout: keep polling and retry.
+    g.status = "requesting";
+    setMsg("gpsNote", "GPS signal temporarily unavailable. Retrying automatically...", "");
+  }
+
   renderGps();
 }
 async function sendLocation(c, timestamp) {

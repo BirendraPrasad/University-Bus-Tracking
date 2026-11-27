@@ -1216,6 +1216,12 @@ tables.trips = new DataTable({
     },
     "trip-date": function (row, value) {
       return String(row.trip_date).slice(0, 10) === value;
+    },
+    "trip-bus-filter": function (row, value) {
+      return String(row.bus_id) === value;
+    },
+    "trip-driver-filter": function (row, value) {
+      return String(row.driver_id) === value;
     }
   },
 
@@ -1244,6 +1250,11 @@ tables.trips = new DataTable({
 },
 
   columns: [
+    {
+      cell: function (row) {
+        return dailyTripNumber(row);
+      }
+    },
     {
       num: true,
       cell: function (row) {
@@ -1394,6 +1405,7 @@ tables.trips = new DataTable({
   }
   function renderKpis() {
     var s = status, d = data;
+
     setKpi("buses", d.buses && d.buses.length, s.buses, errors.buses);
     setKpi("drivers", d.drivers && d.drivers.length, s.drivers, errors.drivers);
     setKpi("routes", d.routes && d.routes.length, s.routes, errors.routes);
@@ -1401,8 +1413,80 @@ tables.trips = new DataTable({
     setKpi("buses-assigned", d.buses && d.buses.filter(function (b) { return b.driver_id !== null && b.driver_id !== undefined; }).length, s.buses, errors.buses);
     setKpi("users", d.users && d.users.length, s.users, errors.users);
     setKpi("students", d.users && d.users.filter(function (u) { return u.role === "STUDENT"; }).length, s.users, errors.users);
-  }
 
+    var trips = Array.isArray(d.trips) ? d.trips : [];
+    function hasStatus(row, value) {
+      return String(row.status || "").toUpperCase() === value;
+    }
+
+    setKpi("scheduled-trips",
+      trips.filter(function (r) { return hasStatus(r, "SCHEDULED"); }).length,
+      s.trips, errors.trips);
+
+    setKpi("active-trips",
+      trips.filter(function (r) { return hasStatus(r, "ACTIVE"); }).length,
+      s.trips, errors.trips);
+
+    // Latest five trips in Overview
+    var recentBody = $("tbl-recent") && $("tbl-recent").tBodies[0];
+    if (recentBody) {
+      recentBody.replaceChildren();
+
+      if (s.trips === "loading" || s.trips === "idle") {
+        var loadingRow = document.createElement("tr");
+        var loadingCell = document.createElement("td");
+        loadingCell.colSpan = 6;
+        loadingCell.textContent = "Loading recent trips...";
+        loadingRow.appendChild(loadingCell);
+        recentBody.appendChild(loadingRow);
+      } else if (s.trips === "error") {
+        var errorRow = document.createElement("tr");
+        var errorCell = document.createElement("td");
+        errorCell.colSpan = 6;
+        errorCell.textContent = "Could not load trips. Check the Trips page.";
+        errorRow.appendChild(errorCell);
+        recentBody.appendChild(errorRow);
+      } else {
+        var latest = trips.slice().sort(function (a, b) {
+          return new Date(b.trip_date || 0) - new Date(a.trip_date || 0);
+        }).slice(0, 5);
+
+        if (!latest.length) {
+          var emptyRow = document.createElement("tr");
+          var emptyCell = document.createElement("td");
+          emptyCell.colSpan = 6;
+          emptyCell.textContent = "No trips available.";
+          emptyRow.appendChild(emptyCell);
+          recentBody.appendChild(emptyRow);
+        } else {
+          var recentPager = recentBody.closest(".table-wrap").nextElementSibling;
+        if (recentPager && recentPager.querySelector("span")) {
+          recentPager.querySelector("span").textContent =
+            "Showing " + latest.length + " latest of " + trips.length + " trips";
+        }
+
+        latest.forEach(function (trip) {
+            var row = document.createElement("tr");
+            var values = [
+              "TRIP-" + (trip.trip_id ?? "—"),
+              trip.bus_number || "—",
+              [trip.route_code, trip.route_name].filter(Boolean).join(" - ") || "—",
+              trip.driver_name || "—",
+              trip.trip_date ? new Date(trip.trip_date).toLocaleDateString() : "—",
+              trip.status || "—"
+            ];
+
+            values.forEach(function (value) {
+              var cell = document.createElement("td");
+              cell.textContent = String(value);
+              row.appendChild(cell);
+            });
+            recentBody.appendChild(row);
+          });
+        }
+      }
+    }
+  }
   /* ------------------------------------------------- filter option lists */
   var driverOptionsKey = "";
   function renderDriverFilter() {
@@ -1996,8 +2080,108 @@ function updateTripDriver() {
   });
 
   /* --------------------------------------------------------------- render */
+
+function renderTripHistoryControlsAndStats() {
+  var busSelect = $("trip-bus-filter");
+  var driverSelect = $("trip-driver-filter");
+
+  function fillSelect(select, firstLabel, rows, idKey, labelFn) {
+    if (!select) return;
+    var previous = select.value;
+    select.replaceChildren();
+
+    var first = document.createElement("option");
+    first.value = "";
+    first.textContent = firstLabel;
+    select.appendChild(first);
+
+    (rows || []).forEach(function (row) {
+      var option = document.createElement("option");
+      option.value = String(row[idKey]);
+      option.textContent = labelFn(row);
+      select.appendChild(option);
+    });
+
+    if ([].some.call(select.options, function (o) { return o.value === previous; })) {
+      select.value = previous;
+    } else {
+      select.value = "";
+    }
+  }
+
+  fillSelect(busSelect, "All buses", data.buses, "bus_id", function (b) {
+    return b.bus_number || ("Bus " + b.bus_id);
+  });
+
+  fillSelect(driverSelect, "All drivers", data.drivers, "driver_id", function (d) {
+    return d.name || ("Driver " + d.driver_id);
+  });
+
+  var trips = data.trips || [];
+  var count = function (statusName) {
+    return trips.filter(function (t) {
+      return String(t.status || "").toUpperCase() === statusName;
+    }).length;
+  };
+
+  $("adminTripTotal").textContent = trips.length;
+  $("adminTripCompleted").textContent = count("COMPLETED");
+  $("adminTripActive").textContent = count("ACTIVE");
+  $("adminTripCancelled").textContent = count("CANCELLED");
+}
+
+function dailyTripNumber(row) {
+  var trips = data.trips || [];
+  var statusName = String(row.status || "").toUpperCase();
+
+  if (statusName !== "ACTIVE" && statusName !== "COMPLETED") {
+    return "—";
+  }
+
+  var busFilter = $("trip-bus-filter").value;
+  var driverFilter = $("trip-driver-filter").value;
+
+  // Bus-wise view: serial per bus per day.
+  // Driver-wise view: serial per driver per day.
+  // Default view: serial per day across all trips.
+  function groupKey(t) {
+    var date = String(t.trip_date || "").slice(0, 10);
+    if (busFilter) return date + "|BUS|" + t.bus_id;
+    if (driverFilter) return date + "|DRIVER|" + t.driver_id;
+    return date + "|ALL";
+  }
+
+  var ordered = trips.slice().sort(function (a, b) {
+    var dateCompare = String(a.trip_date || "").localeCompare(String(b.trip_date || ""));
+    if (dateCompare !== 0) return dateCompare;
+
+    var timeA = a.start_time ? new Date(a.start_time).getTime() : 0;
+    var timeB = b.start_time ? new Date(b.start_time).getTime() : 0;
+    if (timeA !== timeB) return timeA - timeB;
+
+    return Number(a.trip_id) - Number(b.trip_id);
+  });
+
+  var counters = {};
+  for (var i = 0; i < ordered.length; i++) {
+    var t = ordered[i];
+    var s = String(t.status || "").toUpperCase();
+    if (s !== "ACTIVE" && s !== "COMPLETED") continue;
+
+    var key = groupKey(t);
+    counters[key] = (counters[key] || 0) + 1;
+
+    if (String(t.trip_id) === String(row.trip_id)) {
+      return "Trip " + String(counters[key]).padStart(2, "0");
+    }
+  }
+
+  return "—";
+}
+
 function renderAll() {
   renderKpis();
+  renderTripHistoryControlsAndStats();
   renderDriverFilter();
   renderPeopleFilters();
   renderStopRouteOptions();
@@ -2670,6 +2854,65 @@ function fleetFreshness(bus) {
     return "OFFLINE";
 }
 
+var fleetLocationCache = {};
+var fleetLocationRequestId = 0;
+
+function resolveFleetLocation(bus) {
+    var target = $("fleet-detail-location");
+    if (!target) return;
+
+    if (!bus || bus.latitude == null || bus.longitude == null) {
+        target.textContent = "No GPS location available";
+        return;
+    }
+
+    var lat = Number(bus.latitude);
+    var lng = Number(bus.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        target.textContent = "Invalid GPS coordinates";
+        return;
+    }
+
+    var key = lat.toFixed(6) + "," + lng.toFixed(6);
+    if (fleetLocationCache[key]) {
+        target.textContent = fleetLocationCache[key];
+        return;
+    }
+
+    var requestId = ++fleetLocationRequestId;
+    target.textContent = "Finding area name...";
+
+    fetch("https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat="
+        + encodeURIComponent(lat) + "&lon=" + encodeURIComponent(lng))
+        .then(function (response) {
+            if (!response.ok) throw new Error("Location lookup unavailable");
+            return response.json();
+        })
+        .then(function (result) {
+            var address = result.address || {};
+            var area = [
+                address.suburb || address.neighbourhood || address.village ||
+                address.town || address.city_district || address.city,
+                address.city || address.town || address.county,
+                address.state
+            ].filter(Boolean);
+
+            var name = area.length
+                ? [...new Set(area)].join(", ")
+                : (result.display_name || "Area name unavailable");
+
+            fleetLocationCache[key] = name;
+            if (requestId === fleetLocationRequestId) {
+                target.textContent = name;
+            }
+        })
+        .catch(function () {
+            if (requestId === fleetLocationRequestId) {
+                target.textContent = "Area name unavailable; coordinates shown below";
+            }
+        });
+}
+
 function updateFleetBusDetails() {
     var select = $("fleet-bus-select");
     if (!select) return;
@@ -2695,6 +2938,8 @@ function updateFleetBusDetails() {
         var element = $(id);
         if (element) element.textContent = String(fields[id]);
     });
+
+    resolveFleetLocation(bus);
 }
 
 function updateFleetBusOptions(buses) {
@@ -2893,6 +3138,206 @@ function refreshFleetMap() {
         toast("Live Fleet Map could not refresh: " + error.message, "error");
     });
 }
+
+
+/* ======================== BULK IMPORT MODULE ======================== */
+var bulkImportFile = null;
+var bulkImportKind = "";
+
+var bulkImportTemplates = {
+  students: ["name", "email", "password", "enrollment_no", "department", "semester"],
+  drivers: ["name", "email", "password", "license_number", "phone"],
+  faculty: ["name", "email", "password", "employee_id", "department"],
+  buses: ["bus_number", "bus_type", "capacity", "registration_number", "route_id"],
+  routes: ["route_name", "route_code", "description", "start_point", "end_point"],
+  stops: ["route_id", "stop_name", "latitude", "longitude", "stop_order", "pickup_time", "drop_time"]
+};
+
+function bulkStatus(message, isError) {
+  var node = $("imp-status");
+  if (!node) return;
+  node.textContent = message;
+  node.style.color = isError ? "#dc2626" : "inherit";
+}
+
+function bulkResetPreview() {
+  var summary = $("imp-summary");
+  var body = $("imp-results") && $("imp-results").querySelector("tbody");
+  if (summary) summary.textContent = "No file validated yet.";
+  if (body) {
+    body.replaceChildren();
+    var tr = el("tr");
+    var td = el("td", "", "No preview available.");
+    td.colSpan = 4;
+    tr.appendChild(td);
+    body.appendChild(tr);
+  }
+  if ($("imp-confirm")) $("imp-confirm").disabled = true;
+}
+
+function bulkDownloadTemplate() {
+  var kind = $("imp-type").value;
+  if (!kind || !bulkImportTemplates[kind]) {
+    toast("Please select a data type first.", "error");
+    return;
+  }
+
+  var csv = bulkImportTemplates[kind].join(",") + "\r\n";
+  var blob = new Blob([csv], {type: "text/csv;charset=utf-8"});
+  var url = URL.createObjectURL(blob);
+  var link = el("a");
+  link.href = url;
+  link.download = kind + "_template.csv";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function bulkRender(data) {
+  $("imp-summary").textContent =
+    "Total: " + data.total + " | Valid: " + data.valid + " | Invalid: " + data.invalid;
+
+  var body = $("imp-results").querySelector("tbody");
+  body.replaceChildren();
+
+  (data.rows || []).forEach(function (item) {
+    var tr = el("tr");
+    tr.appendChild(el("td", "", String(item.row)));
+    tr.appendChild(el("td", "", item.valid ? "VALID" : "INVALID"));
+    tr.appendChild(el("td", "", item.error || "-"));
+
+    var values = item.data || {};
+    var display = Object.keys(values).map(function (key) {
+      return key + ": " + String(values[key]);
+    }).join(" | ");
+    tr.appendChild(el("td", "", display || "-"));
+    body.appendChild(tr);
+  });
+
+  $("imp-confirm").disabled = !(data.valid > 0 && data.invalid === 0);
+}
+
+function bulkUpload(confirmImport) {
+  var form = new FormData();
+  form.append("file", bulkImportFile);
+
+  var path = "/users/bulk-import/" + encodeURIComponent(bulkImportKind) +
+    "?confirm=" + (confirmImport ? "true" : "false");
+
+  return fetch(API_BASE + path, {
+    method: "POST",
+    headers: {
+      "Accept": "application/json",
+      "Authorization": "Bearer " + auth.token
+    },
+    body: form
+  }).then(function (res) {
+    return res.text().then(function (txt) {
+      var body = null;
+      try { body = txt ? JSON.parse(txt) : null; } catch (e) {}
+
+      if (!res.ok) {
+        var detail = body && body.detail;
+        if (detail && typeof detail === "object") {
+          if (detail.rows) {
+            bulkRender({
+              total: Number(detail.valid || 0) + Number(detail.invalid || 0),
+              valid: detail.valid || 0,
+              invalid: detail.invalid || 0,
+              rows: detail.rows
+            });
+          }
+          throw new Error(detail.message || "Import validation failed.");
+        }
+        throw new Error(detailText(body) || "Upload failed (" + res.status + ").");
+      }
+      return body;
+    });
+  });
+}
+
+function bulkPreview() {
+  var kind = $("imp-type").value;
+  var file = $("imp-file").files[0];
+
+  if (!kind) return toast("Select a data type.", "error");
+  if (!file) return toast("Choose a CSV file.", "error");
+  if (!file.name.toLowerCase().endsWith(".csv"))
+    return toast("Only CSV files are supported.", "error");
+  if (file.size > 5 * 1024 * 1024)
+    return toast("CSV file must be under 5 MB.", "error");
+
+  bulkImportKind = kind;
+  bulkImportFile = file;
+  $("imp-preview").disabled = true;
+  $("imp-confirm").disabled = true;
+  bulkResetPreview();
+  bulkStatus("Validating CSV. Please wait...", false);
+
+  bulkUpload(false).then(function (data) {
+    bulkRender(data);
+    bulkStatus(
+      data.invalid === 0
+        ? "All rows are valid. Review them before confirming."
+        : "Invalid rows found. Correct the CSV and upload again.",
+      data.invalid > 0
+    );
+  }).catch(function (error) {
+    bulkStatus(error.message, true);
+    toast(error.message, "error");
+  }).finally(function () {
+    $("imp-preview").disabled = false;
+  });
+}
+
+function bulkConfirm() {
+  if (!bulkImportFile || !bulkImportKind) return;
+
+  if (!window.confirm(
+    "Import all rows from " + bulkImportFile.name +
+    " into the database? This action creates records."
+  )) return;
+
+  $("imp-confirm").disabled = true;
+  $("imp-preview").disabled = true;
+  bulkStatus("Importing records...", false);
+
+  bulkUpload(true).then(function (data) {
+    bulkStatus(data.message + " Imported: " + data.imported, false);
+    toast(data.message + " Imported: " + data.imported, "success");
+    bulkImportFile = null;
+    $("imp-file").value = "";
+    bulkResetPreview();
+    if (typeof loadAll === "function") loadAll();
+  }).catch(function (error) {
+    bulkStatus(error.message, true);
+    toast(error.message, "error");
+  }).finally(function () {
+    $("imp-preview").disabled = false;
+  });
+}
+
+$("imp-template").addEventListener("click", bulkDownloadTemplate);
+$("imp-preview").addEventListener("click", bulkPreview);
+$("imp-confirm").addEventListener("click", bulkConfirm);
+
+$("imp-type").addEventListener("change", function () {
+  bulkImportFile = null;
+  bulkImportKind = "";
+  $("imp-file").value = "";
+  bulkResetPreview();
+  bulkStatus("", false);
+});
+
+$("imp-file").addEventListener("change", function () {
+  bulkImportFile = null;
+  bulkImportKind = "";
+  bulkResetPreview();
+  bulkStatus("", false);
+});
+/* ====================== END BULK IMPORT MODULE ====================== */
+
 
 window.addEventListener("hashchange", function () {
     window.setTimeout(function () {
