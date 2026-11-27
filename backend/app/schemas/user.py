@@ -109,3 +109,22 @@ class RegisterRequest(BaseModel):
     # Driver details
     license_number: str | None = None
     phone: str | None = None
+
+
+class EmailOTPVerify(BaseModel):
+    email: EmailStr
+    otp: str
+
+
+class EmailOTPResend(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetConfirm(BaseModel):
+    email: EmailStr
+    otp: str
+    new_password: str

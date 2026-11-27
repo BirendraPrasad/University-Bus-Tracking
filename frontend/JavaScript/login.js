@@ -2,6 +2,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const API_BASE = window.API_BASE_URL;
     const LOGIN_URL = `${API_BASE}/auth/login`;
+    const FORGOT_URL = `${API_BASE}/auth/forgot-password`;
+    const RESET_URL = `${API_BASE}/auth/reset-password`;
 
     // =========================
     // ROLE → DASHBOARD
@@ -148,10 +150,164 @@ document.addEventListener("DOMContentLoaded", function () {
 
         forgotLink.addEventListener("click", function () {
 
-            showMessage(
-                "Password recovery will be available soon.",
-                "info"
-            );
+            let panel = document.getElementById("passwordResetPanel");
+
+            if (panel) {
+                panel.hidden = !panel.hidden;
+                return;
+            }
+
+            panel = document.createElement("div");
+            panel.id = "passwordResetPanel";
+            panel.className = "form-message info";
+            panel.style.padding = "20px";
+            panel.style.marginTop = "15px";
+
+            panel.innerHTML = `
+                <h3>Forgot Password?</h3>
+                <p>Enter your registered email to receive a password reset OTP.</p>
+
+                <input type="email" id="resetEmail"
+                    placeholder="Registered email address">
+
+                <button type="button" id="requestResetOtp">
+                    Send Reset OTP
+                </button>
+
+                <div id="resetFields" hidden>
+                    <input type="text" id="resetOtp"
+                        placeholder="Enter 6-digit OTP"
+                        maxlength="6" inputmode="numeric">
+
+                    <input type="password" id="newResetPassword"
+                        placeholder="New password">
+
+                    <input type="password" id="confirmResetPassword"
+                        placeholder="Confirm new password">
+
+                    <button type="button" id="submitPasswordReset">
+                        Reset Password
+                    </button>
+                </div>
+
+                <p id="resetMessage" role="status"></p>
+            `;
+
+            form.insertAdjacentElement("afterend", panel);
+
+            const resetEmail = panel.querySelector("#resetEmail");
+            const requestBtn = panel.querySelector("#requestResetOtp");
+            const resetFields = panel.querySelector("#resetFields");
+            const resetMessage = panel.querySelector("#resetMessage");
+
+            resetEmail.value = emailInput.value.trim();
+
+            requestBtn.addEventListener("click", async () => {
+
+                const email = resetEmail.value.trim();
+
+                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                    resetMessage.textContent = "Enter a valid email address.";
+                    return;
+                }
+
+                requestBtn.disabled = true;
+                resetMessage.textContent = "Requesting OTP...";
+
+                try {
+                    const response = await fetch(FORGOT_URL, {
+                        method: "POST",
+                        headers: {"Content-Type": "application/json"},
+                        body: JSON.stringify({email})
+                    });
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(data.detail || "OTP request failed.");
+                    }
+
+                    resetFields.hidden = false;
+                    resetMessage.textContent = data.message;
+
+                } catch (error) {
+                    resetMessage.textContent = error.message;
+                } finally {
+                    requestBtn.disabled = false;
+                }
+            });
+
+            panel.querySelector("#resetOtp").addEventListener("input", event => {
+                event.target.value = event.target.value.replace(/\D/g, "").slice(0, 6);
+            });
+
+            panel.querySelector("#submitPasswordReset").addEventListener("click", async () => {
+
+                const email = resetEmail.value.trim();
+                const otp = panel.querySelector("#resetOtp").value.trim();
+                const newPassword = panel.querySelector("#newResetPassword").value;
+                const confirmPassword = panel.querySelector("#confirmResetPassword").value;
+
+                if (!/^[0-9]{6}$/.test(otp)) {
+                    resetMessage.textContent = "Enter a valid 6-digit OTP.";
+                    return;
+                }
+
+                if (
+                    newPassword.length < 8 ||
+                    !/[A-Z]/.test(newPassword) ||
+                    !/[a-z]/.test(newPassword) ||
+                    !/[0-9]/.test(newPassword) ||
+                    !/[^A-Za-z0-9]/.test(newPassword)
+                ) {
+                    resetMessage.textContent =
+                        "Password needs 8 characters, uppercase, lowercase, number and special character.";
+                    return;
+                }
+
+                if (newPassword !== confirmPassword) {
+                    resetMessage.textContent = "Passwords do not match.";
+                    return;
+                }
+
+                const submitBtn = panel.querySelector("#submitPasswordReset");
+                submitBtn.disabled = true;
+                resetMessage.textContent = "Resetting password...";
+
+                try {
+                    const response = await fetch(RESET_URL, {
+                        method: "POST",
+                        headers: {"Content-Type": "application/json"},
+                        body: JSON.stringify({
+                            email,
+                            otp,
+                            new_password: newPassword
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(data.detail || "Password reset failed.");
+                    }
+
+                    resetMessage.textContent = data.message;
+                    resetMessage.className = "success";
+
+                    setTimeout(() => {
+                        panel.remove();
+                        form.hidden = false;
+                        emailInput.value = email;
+                        passwordInput.value = "";
+                        showMessage("Password reset successful. Please login.", "success");
+                    }, 1800);
+
+                } catch (error) {
+                    resetMessage.textContent = error.message;
+                } finally {
+                    submitBtn.disabled = false;
+                }
+            });
 
         });
     }

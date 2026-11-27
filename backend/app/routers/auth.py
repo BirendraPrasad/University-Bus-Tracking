@@ -1,15 +1,105 @@
 
+import re
+from datetime import timedelta
+
 from fastapi import APIRouter, HTTPException
 
 from backend.app.database.connection import get_connection
-from backend.app.schemas.user import UserLogin, RegisterRequest
+from backend.app.schemas.user import (
+    UserLogin,
+    RegisterRequest,
+    EmailOTPVerify,
+    EmailOTPResend,
+    PasswordResetRequest,
+    PasswordResetConfirm,
+)
 from backend.app.services.security import verify_password, hash_password
 from backend.app.services.auth import create_access_token
+from backend.app.services.email_service import (
+    generate_email_otp,
+    hash_email_otp,
+    verify_email_otp_hash,
+    send_email_otp,
+)
 
 router = APIRouter(
     prefix="/auth",
     tags=["Authentication"]
 )
+
+
+# ============================================
+# PASSWORD VALIDATION
+# ============================================
+
+def validate_password(password: str):
+    if len(password) < 8:
+        raise HTTPException(
+            status_code=400,
+            detail="Password must contain at least 8 characters"
+        )
+
+    if not re.search(r"[A-Z]", password):
+        raise HTTPException(
+            status_code=400,
+            detail="Password must contain an uppercase letter"
+        )
+
+    if not re.search(r"[a-z]", password):
+        raise HTTPException(
+            status_code=400,
+            detail="Password must contain a lowercase letter"
+        )
+
+    if not re.search(r"\d", password):
+        raise HTTPException(
+            status_code=400,
+            detail="Password must contain a number"
+        )
+
+    if not re.search(r"[^A-Za-z0-9]", password):
+        raise HTTPException(
+            status_code=400,
+            detail="Password must contain a special character"
+        )
+
+
+# ============================================
+# OTP HELPER
+# ============================================
+
+def save_otp(cursor, user_id: int, purpose: str, otp: str):
+    cursor.execute("""
+        INSERT INTO email_verification_otps
+            (user_id, otp_hash, expires_at, attempts, purpose, created_at)
+        VALUES (
+            %s, %s,
+            CURRENT_TIMESTAMP + INTERVAL '5 minutes',
+            0, %s, CURRENT_TIMESTAMP
+        )
+        ON CONFLICT (user_id)
+        DO UPDATE SET
+            otp_hash = EXCLUDED.otp_hash,
+            expires_at = EXCLUDED.expires_at,
+            attempts = 0,
+            purpose = EXCLUDED.purpose,
+            created_at = CURRENT_TIMESTAMP
+    """, (
+        user_id,
+        hash_email_otp(otp),
+        purpose
+    ))
+
+
+def send_otp_safely(email: str, otp: str, purpose: str):
+    try:
+        send_email_otp(email, otp, purpose)
+    except Exception as exc:
+        print("OTP email sending failed:", str(exc))
+        raise HTTPException(
+            status_code=503,
+            detail="Email could not be sent. Please try resending the OTP."
+        )
 
 
 # ============================================
@@ -24,7 +114,8 @@ def login(user: UserLogin):
         with conn.cursor() as cursor:
 
             cursor.execute("""
-                SELECT user_id, name, email, password_hash, role, is_active
+                SELECT user_id, name, email, password_hash,
+                       role, is_active, email_verified
                 FROM users
                 WHERE email = %s
             """, (user.email,))
@@ -41,6 +132,13 @@ def login(user: UserLogin):
                 raise HTTPException(
                     status_code=401,
                     detail="Invalid email or password"
+                )
+
+            # Email verification check
+            if not db_user[6]:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Please verify your email before login"
                 )
 
             # Driver approval verification
@@ -172,12 +270,7 @@ def register(user: RegisterRequest):
             detail="ADMIN accounts cannot be created through public registration"
         )
 
-    # Password validation
-    if len(user.password) < 8:
-        raise HTTPException(
-            status_code=400,
-            detail="Password must contain at least 8 characters"
-        )
+    validate_password(user.password)
 
     # Student validation
     if user.role == "STUDENT":
@@ -233,7 +326,6 @@ def register(user: RegisterRequest):
     conn = get_connection()
 
     try:
-
         with conn.cursor() as cursor:
 
             # Check duplicate email
@@ -249,24 +341,21 @@ def register(user: RegisterRequest):
                     detail="An account with this email already exists"
                 )
 
-            # Hash password
             password_hash = hash_password(user.password)
 
-            # Create user
-            # Driver account remains inactive until approval
-            is_active = user.role != "DRIVER"
-
+            # All new accounts remain inactive until email verification.
+            # Driver also requires Admin approval after email verification.
             cursor.execute("""
                 INSERT INTO users
-                    (name, email, password_hash, role, is_active)
-                VALUES (%s, %s, %s, %s, %s)
+                    (name, email, password_hash, role,
+                     is_active, email_verified)
+                VALUES (%s, %s, %s, %s, FALSE, FALSE)
                 RETURNING user_id, name, email, role
             """, (
                 user.name,
                 user.email,
                 password_hash,
-                user.role,
-                is_active
+                user.role
             ))
 
             created_user = cursor.fetchone()
@@ -335,44 +424,464 @@ def register(user: RegisterRequest):
                     "DRIVER_REQUEST"
                 ))
 
+            # Create registration OTP
+            otp = generate_email_otp()
+            save_otp(cursor, user_id, "REGISTER", otp)
+
             conn.commit()
 
-            # Registration response
-            response = {
-                "message": "Registration successful",
-                "user_id": user_id,
-                "name": created_user[1],
-                "email": created_user[2],
-                "role": created_user[3]
-            }
+        # Send OTP after database commit
+        send_otp_safely(user.email, otp, "REGISTER")
 
-            if user.role == "STUDENT":
-                response["student_id"] = student_id
+        response = {
+            "message": "Registration successful. Please verify your email using the OTP sent to your inbox.",
+            "user_id": user_id,
+            "name": created_user[1],
+            "email": created_user[2],
+            "role": created_user[3],
+            "email_verification_required": True
+        }
 
-            elif user.role == "FACULTY":
-                response["faculty_id"] = faculty_id
+        if user.role == "STUDENT":
+            response["student_id"] = student_id
 
-            elif user.role == "DRIVER":
-                response["approval_status"] = "PENDING"
-                response["message"] = (
-                    "Registration submitted. Waiting for admin approval."
-                )
+        elif user.role == "FACULTY":
+            response["faculty_id"] = faculty_id
 
-            return response
+        elif user.role == "DRIVER":
+            response["approval_status"] = "PENDING"
+            response["message"] = (
+                "Registration submitted. Verify your email first. "
+                "Admin approval is also required for driver login."
+            )
+
+        return response
 
     except HTTPException:
         conn.rollback()
         raise
 
-    except Exception as e:
-
+    except Exception as exc:
         conn.rollback()
-
-        print("Registration error:", e)
+        print("Registration error:", str(exc))
 
         raise HTTPException(
             status_code=500,
             detail="Registration failed due to a server error"
+        )
+
+    finally:
+        conn.close()
+
+
+# ============================================
+# VERIFY EMAIL OTP
+# ============================================
+
+@router.post("/verify-email")
+def verify_email(data: EmailOTPVerify):
+
+    conn = get_connection()
+
+    try:
+        with conn.cursor() as cursor:
+
+            cursor.execute("""
+                SELECT
+                    u.user_id,
+                    u.role,
+                    u.email_verified,
+                    o.otp_hash,
+                    o.expires_at,
+                    o.attempts,
+                    o.purpose
+                FROM users u
+                JOIN email_verification_otps o
+                    ON o.user_id = u.user_id
+                WHERE u.email = %s
+                FOR UPDATE OF u, o
+            """, (data.email,))
+
+            record = cursor.fetchone()
+
+            if not record:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Invalid or expired OTP"
+                )
+
+            user_id, role, email_verified, otp_hash, expires_at, attempts, purpose = record
+
+            if email_verified:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Email is already verified"
+                )
+
+            if purpose != "REGISTER":
+                raise HTTPException(
+                    status_code=400,
+                    detail="Invalid registration OTP"
+                )
+
+            if attempts >= 5:
+                raise HTTPException(
+                    status_code=429,
+                    detail="Too many incorrect attempts. Request a new OTP."
+                )
+
+            cursor.execute("""
+                SELECT expires_at <= CURRENT_TIMESTAMP
+                FROM email_verification_otps
+                WHERE user_id = %s
+            """, (user_id,))
+
+            expired = cursor.fetchone()[0]
+
+            if expired:
+                raise HTTPException(
+                    status_code=400,
+                    detail="OTP has expired. Please request a new OTP."
+                )
+
+            if not verify_email_otp_hash(data.otp, otp_hash):
+                cursor.execute("""
+                    UPDATE email_verification_otps
+                    SET attempts = attempts + 1
+                    WHERE user_id = %s
+                """, (user_id,))
+
+                conn.commit()
+
+                raise HTTPException(
+                    status_code=400,
+                    detail="Incorrect OTP"
+                )
+
+            # Verify email. Driver still waits for Admin approval.
+            if role in ("STUDENT", "FACULTY"):
+                cursor.execute("""
+                    UPDATE users
+                    SET email_verified = TRUE,
+                        is_active = TRUE
+                    WHERE user_id = %s
+                """, (user_id,))
+            else:
+                cursor.execute("""
+                    UPDATE users
+                    SET email_verified = TRUE,
+                        is_active = FALSE
+                    WHERE user_id = %s
+                """, (user_id,))
+
+            cursor.execute("""
+                DELETE FROM email_verification_otps
+                WHERE user_id = %s
+            """, (user_id,))
+
+            conn.commit()
+
+            if role == "DRIVER":
+                return {
+                    "message": "Email verified successfully. Your driver account is waiting for Admin approval.",
+                    "email_verified": True,
+                    "approval_status": "PENDING"
+                }
+
+            return {
+                "message": "Email verified successfully. You can now login.",
+                "email_verified": True
+            }
+
+    except HTTPException:
+        if conn.info.transaction_status != 0:
+            conn.rollback()
+        raise
+
+    except Exception as exc:
+        conn.rollback()
+        print("Email verification error:", str(exc))
+
+        raise HTTPException(
+            status_code=500,
+            detail="Email verification failed"
+        )
+
+    finally:
+        conn.close()
+
+
+# ============================================
+# RESEND REGISTRATION OTP
+# ============================================
+
+@router.post("/resend-otp")
+def resend_otp(data: EmailOTPResend):
+
+    conn = get_connection()
+    otp = None
+
+    try:
+        with conn.cursor() as cursor:
+
+            cursor.execute("""
+                SELECT user_id, email_verified
+                FROM users
+                WHERE email = %s
+            """, (data.email,))
+
+            account = cursor.fetchone()
+
+            if not account:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Account not found"
+                )
+
+            user_id, email_verified = account
+
+            if email_verified:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Email is already verified"
+                )
+
+            cursor.execute("""
+                SELECT created_at, purpose
+                FROM email_verification_otps
+                WHERE user_id = %s
+                FOR UPDATE
+            """, (user_id,))
+
+            existing = cursor.fetchone()
+
+            if existing and existing[1] == "REGISTER":
+                cursor.execute("""
+                    SELECT created_at > CURRENT_TIMESTAMP - INTERVAL '60 seconds'
+                    FROM email_verification_otps
+                    WHERE user_id = %s
+                """, (user_id,))
+
+                cooldown_active = cursor.fetchone()[0]
+
+                if cooldown_active:
+                    raise HTTPException(
+                        status_code=429,
+                        detail="Please wait 60 seconds before requesting another OTP"
+                    )
+
+            otp = generate_email_otp()
+            save_otp(cursor, user_id, "REGISTER", otp)
+
+            conn.commit()
+
+        send_otp_safely(data.email, otp, "REGISTER")
+
+        return {
+            "message": "A new verification OTP has been sent to your email."
+        }
+
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception as exc:
+        conn.rollback()
+        print("Resend OTP error:", str(exc))
+
+        raise HTTPException(
+            status_code=500,
+            detail="Could not resend OTP"
+        )
+
+    finally:
+        conn.close()
+
+
+# ============================================
+# FORGOT PASSWORD - REQUEST OTP
+# ============================================
+
+@router.post("/forgot-password")
+def forgot_password(data: PasswordResetRequest):
+
+    conn = get_connection()
+    otp = None
+    should_send = False
+
+    # Same response whether the email exists or not.
+    generic_response = {
+        "message": "If an account exists with this email, a password reset OTP will be sent."
+    }
+
+    try:
+        with conn.cursor() as cursor:
+
+            cursor.execute("""
+                SELECT user_id
+                FROM users
+                WHERE email = %s
+            """, (data.email,))
+
+            account = cursor.fetchone()
+
+            if account:
+                user_id = account[0]
+
+                cursor.execute("""
+                    SELECT created_at
+                    FROM email_verification_otps
+                    WHERE user_id = %s
+                    FOR UPDATE
+                """, (user_id,))
+
+                existing = cursor.fetchone()
+
+                if existing:
+                    cursor.execute("""
+                        SELECT created_at > CURRENT_TIMESTAMP - INTERVAL '60 seconds'
+                        FROM email_verification_otps
+                        WHERE user_id = %s
+                    """, (user_id,))
+
+                    cooldown_active = cursor.fetchone()[0]
+
+                    if cooldown_active:
+                        conn.commit()
+                        return generic_response
+
+                otp = generate_email_otp()
+                save_otp(cursor, user_id, "RESET", otp)
+                should_send = True
+
+            conn.commit()
+
+        if should_send:
+            try:
+                send_email_otp(data.email, otp, "RESET")
+            except Exception as exc:
+                print("Password reset email failed:", str(exc))
+
+        return generic_response
+
+    except Exception as exc:
+        conn.rollback()
+        print("Forgot password error:", str(exc))
+
+        return generic_response
+
+    finally:
+        conn.close()
+
+
+# ============================================
+# RESET PASSWORD - VERIFY OTP
+# ============================================
+
+@router.post("/reset-password")
+def reset_password(data: PasswordResetConfirm):
+
+    validate_password(data.new_password)
+
+    conn = get_connection()
+
+    try:
+        with conn.cursor() as cursor:
+
+            cursor.execute("""
+                SELECT
+                    u.user_id,
+                    o.otp_hash,
+                    o.expires_at,
+                    o.attempts,
+                    o.purpose
+                FROM users u
+                JOIN email_verification_otps o
+                    ON o.user_id = u.user_id
+                WHERE u.email = %s
+                FOR UPDATE OF u, o
+            """, (data.email,))
+
+            record = cursor.fetchone()
+
+            if not record:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Invalid or expired OTP"
+                )
+
+            user_id, otp_hash, expires_at, attempts, purpose = record
+
+            if purpose != "RESET":
+                raise HTTPException(
+                    status_code=400,
+                    detail="Invalid password reset OTP"
+                )
+
+            if attempts >= 5:
+                raise HTTPException(
+                    status_code=429,
+                    detail="Too many incorrect attempts. Request a new OTP."
+                )
+
+            cursor.execute("""
+                SELECT expires_at <= CURRENT_TIMESTAMP
+                FROM email_verification_otps
+                WHERE user_id = %s
+            """, (user_id,))
+
+            expired = cursor.fetchone()[0]
+
+            if expired:
+                raise HTTPException(
+                    status_code=400,
+                    detail="OTP has expired. Request a new one."
+                )
+
+            if not verify_email_otp_hash(data.otp, otp_hash):
+                cursor.execute("""
+                    UPDATE email_verification_otps
+                    SET attempts = attempts + 1
+                    WHERE user_id = %s
+                """, (user_id,))
+
+                conn.commit()
+
+                raise HTTPException(
+                    status_code=400,
+                    detail="Incorrect OTP"
+                )
+
+            new_hash = hash_password(data.new_password)
+
+            cursor.execute("""
+                UPDATE users
+                SET password_hash = %s
+                WHERE user_id = %s
+            """, (new_hash, user_id))
+
+            cursor.execute("""
+                DELETE FROM email_verification_otps
+                WHERE user_id = %s
+            """, (user_id,))
+
+            conn.commit()
+
+            return {
+                "message": "Password reset successful. Please login with your new password."
+            }
+
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception as exc:
+        conn.rollback()
+        print("Password reset error:", str(exc))
+
+        raise HTTPException(
+            status_code=500,
+            detail="Password reset failed"
         )
 
     finally:

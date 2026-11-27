@@ -22,6 +22,8 @@
        POST /auth/register
     */
     const REGISTER_URL = `${API_BASE}/auth/register`;
+    const VERIFY_URL = `${API_BASE}/auth/verify-email`;
+    const RESEND_URL = `${API_BASE}/auth/resend-otp`;
 
 
     // =====================================================
@@ -104,6 +106,130 @@
 
 
     // =====================================================
+    
+    // =====================================================
+    // EMAIL OTP VERIFICATION
+    // =====================================================
+
+    function showOtpVerification(email, role, initialMessage = "") {
+        form.hidden = true;
+
+        const oldPanel = document.getElementById("otpVerificationPanel");
+        if (oldPanel) oldPanel.remove();
+
+        const panel = document.createElement("div");
+        panel.id = "otpVerificationPanel";
+        panel.className = "form-message info";
+        panel.style.padding = "20px";
+        panel.style.marginTop = "20px";
+
+        panel.innerHTML = `
+            <h3>Verify Your Email</h3>
+            <p id="otpInfo"></p>
+            <input type="text" id="emailOtp"
+                placeholder="Enter 6-digit OTP"
+                maxlength="6" inputmode="numeric"
+                autocomplete="one-time-code">
+            <button type="button" id="verifyOtpBtn">Verify Email</button>
+            <button type="button" id="resendOtpBtn">Resend OTP</button>
+            <p id="otpMessage" role="status"></p>
+        `;
+
+        form.insertAdjacentElement("afterend", panel);
+
+        const otpInput = panel.querySelector("#emailOtp");
+        const verifyBtn = panel.querySelector("#verifyOtpBtn");
+        const resendBtn = panel.querySelector("#resendOtpBtn");
+        const otpMessage = panel.querySelector("#otpMessage");
+
+        panel.querySelector("#otpInfo").textContent =
+            initialMessage || `A verification code has been sent to ${email}.`;
+
+        otpInput.addEventListener("input", () => {
+            otpInput.value = otpInput.value.replace(/\D/g, "").slice(0, 6);
+        });
+
+        verifyBtn.addEventListener("click", async () => {
+            const otp = otpInput.value.trim();
+
+            if (!/^[0-9]{6}$/.test(otp)) {
+                otpMessage.textContent = "Enter a valid 6-digit OTP.";
+                return;
+            }
+
+            verifyBtn.disabled = true;
+            otpMessage.textContent = "Verifying...";
+
+            try {
+                const response = await fetch(VERIFY_URL, {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({email, otp})
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.detail || "OTP verification failed.");
+                }
+
+                otpMessage.textContent = data.message;
+                otpMessage.className = "success";
+
+                setTimeout(() => {
+                    window.location.href = "login.html";
+                }, 1800);
+
+            } catch (error) {
+                otpMessage.textContent = error.message;
+                otpMessage.className = "error";
+            } finally {
+                verifyBtn.disabled = false;
+            }
+        });
+
+        resendBtn.addEventListener("click", async () => {
+            resendBtn.disabled = true;
+            otpMessage.textContent = "Sending new OTP...";
+
+            try {
+                const response = await fetch(RESEND_URL, {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({email})
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.detail || "Could not resend OTP.");
+                }
+
+                otpMessage.textContent = data.message;
+
+                let seconds = 60;
+                resendBtn.textContent = `Wait ${seconds}s`;
+
+                const cooldown = setInterval(() => {
+                    seconds--;
+
+                    if (seconds <= 0) {
+                        clearInterval(cooldown);
+                        resendBtn.disabled = false;
+                        resendBtn.textContent = "Resend OTP";
+                    } else {
+                        resendBtn.textContent = `Wait ${seconds}s`;
+                    }
+                }, 1000);
+
+            } catch (error) {
+                otpMessage.textContent = error.message;
+                resendBtn.disabled = false;
+                resendBtn.textContent = "Resend OTP";
+            }
+        });
+    }
+
     // ROLE CHANGE
     // =====================================================
 
@@ -182,14 +308,13 @@
     // =====================================================
 
     function validPassword(password) {
-
-        /*
-           Minimum:
-           8 characters
-        */
-
-        return password.length >= 8;
-
+        return (
+            password.length >= 8 &&
+            /[A-Z]/.test(password) &&
+            /[a-z]/.test(password) &&
+            /[0-9]/.test(password) &&
+            /[^A-Za-z0-9]/.test(password)
+        );
     }
 
 
@@ -301,7 +426,7 @@
             if (!validPassword(password)) {
 
                 showMessage(
-                    "Password must contain at least 8 characters."
+                    "Password must contain 8 characters, uppercase, lowercase, number and special character."
                 );
 
                 passwordInput.focus();
@@ -574,39 +699,14 @@
 
                 // =================================================
                 // SUCCESS
-                // =================================================
 
-                showMessage(
-                    role === "DRIVER"
-                    ? "Registration submitted successfully. Waiting for Admin approval."
-                    : "Account created successfully. Redirecting to login...",
-                    "success"
+                showOtpVerification(
+                    email,
+                    role,
+                    data.message || "Registration successful. Please verify your email."
                 );
 
-
-                form.reset();
-
-                studentFields.hidden = true;
-
-                facultyFields.hidden = true;
-
-                driverFields.hidden = true;
-
-
-               if (role !== "DRIVER")
-                {
-
-                    setTimeout(
-                        function () {
-                            window.location.href =
-                                "login.html";
-                        },
-                        1200
-                    );
-                }
-
-
-            } 
+            }
             catch (error)
             {
 
